@@ -465,7 +465,7 @@ await paso(P, 'whatsapp-config', 1)
 await alp(P, `a.config.whatsapp.modo = 'mock'`)
 
 // 1 (final). Cambio de rubro
-await alp(P, `a.irA('equipo'); a.nuevoRubro = { rubro: 'Veterinaria y pet shop', nombre: 'Veterinaria Patitas', ciudad: '', listaPrecios: '', borrarVentas: true }`)
+await alp(P, `a.irA('equipo'); a.nuevoRubro = { rubro: 'Veterinaria y pet shop', nombre: 'Veterinaria Patitas', ciudad: '', listaPrecios: '', borrarVentas: true, conEjemplos: true }`)
 await alElemento(P, '.rubro-config h6', 200)
 await paso(P, 'alta-y-rubro', 4)
 await alp(P, `await a.cambiarRubroIA()`)

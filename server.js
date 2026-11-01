@@ -239,7 +239,8 @@ app.post('/api/negocio/rubro', async (c) => {
     db.prepare('DELETE FROM wa_mensajes').run()
   }
   guardarNegocio(nuevo)
-  if (body.borrarVentas !== false && body.conEjemplos !== false) cargarEjemplos(nuevo)
+  // Datos de demo del rubro nuevo: solo si lo pidió (se pregunta al cambiar de rubro).
+  if (body.conEjemplos === true) cargarEjemplos(nuevo)
   return c.json(negocioPublico(nuevo))
 })
 

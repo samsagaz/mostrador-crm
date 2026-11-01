@@ -297,7 +297,8 @@
             <label>Nombre del negocio <input x-model="nuevoRubro.nombre" :placeholder="negocio.nombre"></label>
           </div>
           <details><summary>Lista de precios del nuevo rubro (opcional)</summary><textarea x-model="nuevoRubro.listaPrecios" rows="3"></textarea></details>
-          <label><input type="checkbox" role="switch" x-model="nuevoRubro.borrarVentas"> Reemplazar las ventas por ejemplos del nuevo rubro</label>
+          <label><input type="checkbox" role="switch" x-model="nuevoRubro.borrarVentas"> Borrar las ventas actuales</label>
+          <label><input type="checkbox" role="switch" x-model="nuevoRubro.conEjemplos"> Cargar información de demo (10 ventas de ejemplo del nuevo rubro, para ver el embudo y el tablero llenos)</label>
           <button class="contrast" @click="cambiarRubroIA" :aria-busy="ocupado" :disabled="ocupado || !nuevoRubro.rubro.trim()">✨ Adaptar todo al nuevo rubro con IA</button>
           <small>La IA rehace el catálogo, el bot (nombre, jerga y vocabulario), el ícono, el color y los datos que hay que pedir. El equipo, WhatsApp y las reglas de avisos quedan.</small>
         </article>

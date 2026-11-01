@@ -275,17 +275,20 @@ document.addEventListener('alpine:init', () => {
       })
     },
     // Cambiar de rubro desde Configuración: la IA rehace catálogo, bot, ícono y color; quedan equipo y WhatsApp.
-    nuevoRubro: { rubro: '', nombre: '', ciudad: '', listaPrecios: '', borrarVentas: true },
+    nuevoRubro: { rubro: '', nombre: '', ciudad: '', listaPrecios: '', borrarVentas: true, conEjemplos: true },
     cambiarRubroIA() {
       const r = this.nuevoRubro
-      if (r.borrarVentas && !confirm(`Se reemplazan el catálogo, el bot y las ventas de ejemplo por los de "${r.rubro}". El equipo y WhatsApp quedan. ¿Seguimos?`)) return
+      const pasos = [`Se rehacen el catálogo, el bot, el ícono y el color para "${r.rubro}".`, 'El equipo, WhatsApp y las reglas de avisos quedan.']
+      if (r.borrarVentas) pasos.push('Se borran las ventas actuales.')
+      pasos.push(r.conEjemplos ? 'Se cargan 10 ventas de demo del nuevo rubro.' : 'No se cargan ventas de demo.')
+      if (!confirm(pasos.join('\n') + '\n\n¿Seguimos?')) return
       return this.intentar('ocupado', async () => {
         this.negocio = await enviarJSON('POST', '/api/negocio/rubro', {
           rubro: r.rubro.trim(), nombre: r.nombre.trim() || this.negocio.nombre, ciudad: r.ciudad.trim() || this.negocio.ciudad,
-          borrarVentas: r.borrarVentas, ...(r.listaPrecios.trim() ? { listaPrecios: r.listaPrecios } : {}),
+          borrarVentas: r.borrarVentas, conEjemplos: r.conEjemplos, ...(r.listaPrecios.trim() ? { listaPrecios: r.listaPrecios } : {}),
         })
         this.config = JSON.parse(JSON.stringify(this.negocio))
-        this.nuevoRubro = { rubro: '', nombre: '', ciudad: '', listaPrecios: '', borrarVentas: true }
+        this.nuevoRubro = { rubro: '', nombre: '', ciudad: '', listaPrecios: '', borrarVentas: true, conEjemplos: true }
         this.prioridades = null
         aplicarTema(this.negocio)
         await this.refrescar()
