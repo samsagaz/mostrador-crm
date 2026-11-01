@@ -14,7 +14,7 @@ if (Number(process.versions.node.split('.')[0]) < 22) throw new Error(`Hace falt
 process.chdir(import.meta.dirname)
 try { process.loadEnvFile() } catch {}
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1'
 const MODEL_AUDIO = process.env.OPENAI_AUDIO_MODEL || 'whisper-1'
 const openai = new OpenAI({ maxRetries: 2, timeout: 60_000 })
 
@@ -325,10 +325,11 @@ Datos que este negocio necesita para cerrar una venta: ${n.datosParaCerrar.join(
 Reglas, una por campo:
 - analisis: una o dos frases: qué quiere el cliente, qué quedó ambiguo y qué tan cerca está de comprar.
 - tipo: pedido (quiere comprar ya), presupuesto (pide precio de varias cosas o un trabajo), consulta (pregunta precio, stock u horario de algo puntual), reclamo, no_es_venta (spam, saludo suelto, algo que no tiene que ver con el negocio).
-- items: uno por producto que nombra. producto: si está en el catálogo, escribí el nombre EXACTO del catálogo y enCatalogo true; si no está, escribilo como lo dijo el cliente y enCatalogo false. cantidad siempre numérica: "media docena" es 6, "un cuarto" es 0.25; si no dice, 1 y agregá la pregunta en faltaInfo. nota: medida, marca, color o detalle que dio, o null. Nunca pongas precios: los calcula el sistema con el catálogo.
-- cliente: el nombre si lo dice; si no, null. telefono: solo si aparece escrito en el mensaje, con los dígitos; si no, null.
-- direccion: calle y altura como la escribió, sin agregar ciudad; null si no la dio. entrega: envio, retiro o null si no lo dijo.
-- faltaInfo: las preguntas concretas (en segunda persona, rioplatense) que hay que hacerle para cerrar la venta, usando los datos que este negocio necesita. Vacío si no falta nada.
+- items: uno por producto que nombra. producto: si está en el catálogo (aunque lo nombre distinto, en plural, abreviado o con una variante como sabor, medida o color), escribí el nombre EXACTO del catálogo, enCatalogo true y la variante en nota; si no está, escribilo como lo dijo el cliente y enCatalogo false. cantidad siempre numérica: "media docena" es 6, "un cuarto" es 0.25; si no dice, 1 y agregá la pregunta en faltaInfo. nota: medida, marca, color o detalle que dio, o null. Nunca pongas precios: los calcula el sistema con el catálogo.
+- cliente: el nombre de quien pide o de la persona para quien es el pedido ("soy Marta", "para María Claudia", "a nombre de Juan" → ese nombre). Solo null si no aparece ningún nombre de persona. telefono: solo si aparece escrito en el mensaje, con los dígitos; si no, null.
+- direccion: calle y altura como la escribió, sin agregar ciudad ("de Callao 123", "a Callao 123", "en Callao 123" → "Callao 123"); null si no la dio.
+- entrega: retiro si dice que pasa a buscar o retira; envio si pide que se lo manden o si da una dirección para el pedido; null solo si no hay ninguna pista.
+- faltaInfo: no preguntes lo que el mensaje ya dice (nombre, dirección, cantidad). Las preguntas concretas (en segunda persona, rioplatense) que hay que hacerle para cerrar la venta, usando los datos que este negocio necesita. Vacío si no falta nada.
 - probabilidad: de 0 a 100, qué tan probable es que compre si le respondemos bien y rápido.
 - urgencia: alta si lo necesita hoy o en horas, o si es un reclamo; media si es para estos días; baja si solo averigua.
 - proximaAccion: la acción concreta que tiene que hacer el negocio ahora, en una frase con verbo (ej. "Mandarle el total y preguntar si retira o le enviamos").

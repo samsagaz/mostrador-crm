@@ -57,7 +57,7 @@ En **⚙️ Configuración → Conexión de WhatsApp**:
 En `/como-funciona.html` hay 9 videos con voz en off (voz masculina, español rioplatense) y el logo de DonWeb:
 uno general y uno por flujo (alta y rubro, WhatsApp, pasarle al bot, leer mensajes y capturas, avisos y seguimiento,
 tablero, QR y modo MOCK/API real). Se generan solos con `node scripts/videos.mjs`: levanta la app con una base aparte,
-la maneja con Chrome (puppeteer-core), saca las capturas con un rótulo por paso, genera la voz con `gpt-4o-mini-tts`
+la maneja con Chrome (puppeteer-core), saca las capturas con un rótulo por paso, genera la voz con `gpt-4.1-tts`
 y arma cada video con ffmpeg.
 
 ## Stack
@@ -71,7 +71,7 @@ Deploy: Cloud Server de DonWeb con pm2 y Caddy (HTTPS).
 npm ci
 cat > .env <<'EOF'
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4.1
 PORT=3000
 EOF
 npm run dev   # http://localhost:3000
