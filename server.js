@@ -994,6 +994,8 @@ app.onError((err, c) => {
       : 'La IA está saturada. Probá de nuevo en unos segundos.'
     return c.json({ error }, 429)
   }
+  if (err instanceof OpenAI.AuthenticationError) return c.json({ error: 'La key de OpenAI es inválida: revisá OPENAI_API_KEY en el .env.' }, 502)
+  if (err instanceof OpenAI.NotFoundError) return c.json({ error: `El modelo ${MODEL} no está disponible para esta key.` }, 502)
   if (err instanceof OpenAI.APIError) return c.json({ error: 'La IA no respondió. Probá de nuevo.' }, 502)
   if (/Standard Schema validation failed/.test(err.message)) return c.json({ error: 'La IA devolvió algo que no pasó la validación. Probá de nuevo.' }, 502)
   if (err instanceof SyntaxError) return c.json({ error: 'El pedido llegó mal armado.' }, 400)
