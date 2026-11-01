@@ -149,7 +149,7 @@
               <span class="prob" :title="'Probabilidad de compra: ' + ficha.probabilidad + '%'"><i :style="'width:' + ficha.probabilidad + '%'"></i></span>
               <small x-text="ficha.probabilidad + '% de que compre'"></small>
             </header>
-            <p class="ia">🧠 <span x-text="ficha.analisis"></span></p>
+            <p class="ia">🧠 <span x-text="ficha.analisis"></span> <button class="oir" x-show="puedeEscuchar()" @click.stop="escuchar(ficha.analisis + '. Próxima acción: ' + ficha.proximaAccion)" title="Escuchar" aria-label="Escuchar">🔊</button></p>
             <div class="grid">
               <label>Cliente <input x-model="ficha.cliente" placeholder="—"></label>
               <label>Teléfono <input x-model="ficha.telefono" placeholder="—"></label>
@@ -327,6 +327,8 @@
         <article>
           <header><strong>⚙️ Reglas de seguimiento <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('reglas')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></strong></header>
           <label><input type="checkbox" role="switch" x-model="config.mostrarAyuda"> Mostrar los íconos de ayuda <span class="ayuda falsa">?</span> en cada sección</label>
+          <label><input type="checkbox" role="switch" x-model="config.escucharMensajes"> Mostrar 🔊 para escuchar los mensajes en vez de leerlos (voz de la IA)</label>
+          <label x-show="config.escucharMensajes"><input type="checkbox" role="switch" x-model="config.leerAutomatico"> En la página de pedidos (QR), leer en voz alta cada respuesta del bot</label>
           <label>Avisarle al responsable cada <input type="number" min="1" x-model.number="config.recordatorioMin" class="corto"> minutos mientras la venta no se mueva</label>
           <label>Si después de <input type="number" min="1" x-model.number="config.escalarTras" class="corto"> avisos nadie la mueve, avisarle también al administrador</label>
           <label>Una venta "se enfría" tras <input type="number" min="0.25" step="0.25" x-model.number="config.enfriaHoras" class="corto"> horas sin respuesta <small>(la IA lo sugirió para tu rubro)</small></label>
@@ -440,7 +442,7 @@
           <div>
             <div class="chat">
               <template x-for="m in sel.mensajes || []">
-                <div class="burbuja" :class="m.de"><span x-text="m.texto"></span><small x-text="hora(m.fecha) + (m.ia ? ' · 🤖 ' + (negocio.botNombre || 'IA') : '')"></small></div>
+                <div class="burbuja" :class="m.de"><span x-text="m.texto"></span> <button class="oir" x-show="puedeEscuchar()" @click.stop="escuchar(m.texto)" title="Escuchar" aria-label="Escuchar">🔊</button><small x-text="hora(m.fecha) + (m.ia ? ' · 🤖 ' + (negocio.botNombre || 'IA') : '')"></small></div>
               </template>
             </div>
             <div role="group">
@@ -450,6 +452,7 @@
             <template x-if="borrador">
               <div>
                 <small class="ia" x-text="'🧠 ' + borrador.analisis"></small>
+                <div class="fila"><small>Mensaje para el cliente</small> <span x-show="puedeEscuchar()"><button class="oir texto" @click="escuchar(borrador.mensaje)">🔊 Escuchar</button></span></div>
                 <textarea x-model="borrador.mensaje" rows="5" aria-label="Mensaje para el cliente"></textarea>
                 <div role="group">
                   <button @click="enviarWa(sel)" :disabled="!sel.telefono || guardando" :aria-busy="guardando" :title="sel.telefono ? '' : 'Esta venta no tiene teléfono'"
@@ -480,7 +483,7 @@
     <template x-if="ayuda">
       <article class="ayuda-caja">
         <header><button aria-label="Cerrar" rel="prev" @click="ayuda = null"></button><strong x-text="ayuda.titulo"></strong></header>
-        <p x-text="ayuda.texto"></p>
+        <p><span x-text="ayuda.texto"></span> <button class="oir" x-show="puedeEscuchar()" @click.stop="escuchar(ayuda.texto + ' ' + ayuda.pasos.join('. '))" title="Escuchar" aria-label="Escuchar">🔊</button></p>
         <ol><template x-for="paso in ayuda.pasos"><li x-text="paso"></li></template></ol>
         <footer>
           <a role="button" :href="'como-funciona.html#' + ayuda.video" target="_blank" rel="noopener">▶️ Ver el video</a>

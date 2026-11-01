@@ -109,6 +109,30 @@ async function achicarImagen(archivo, lado = 1280) {
   return canvas.toDataURL('image/jpeg', 0.85)
 }
 
+// Escuchar un mensaje: pide el audio al servidor (voz de OpenAI) y, si falla, usa la voz del navegador.
+let audioActual = null, textoActual = ''
+async function escuchar(texto) {
+  const t = String(texto || '').trim()
+  if (!t) return
+  if (audioActual && textoActual === t) { audioActual.pause(); audioActual = null; textoActual = ''; speechSynthesis?.cancel(); return }
+  audioActual?.pause(); speechSynthesis?.cancel()
+  textoActual = t
+  try {
+    const r = await fetch('/api/voz', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ texto: t.slice(0, 1200) }) })
+    if (!r.ok) throw new Error()
+    audioActual = new Audio(URL.createObjectURL(await r.blob()))
+    audioActual.onended = () => { audioActual = null; textoActual = '' }
+    await audioActual.play()
+  } catch {
+    if (!('speechSynthesis' in window)) return
+    const u = new SpeechSynthesisUtterance(t)
+    u.lang = 'es-AR'
+    u.onend = () => { textoActual = '' }
+    speechSynthesis.speak(u)
+    audioActual = { pause: () => speechSynthesis.cancel() }
+  }
+}
+
 // Personalidad visual del rubro: color principal, favicon con el ícono del rubro y título de la pestaña.
 function oscurecer(hex, k = 0.55) {
   const n = parseInt(hex.slice(1), 16)
@@ -213,7 +237,8 @@ function dibujarQR(url, id = 'qr') {
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
-    RUBROS, ETAPAS, PESTANAS, ayuda: null,
+    RUBROS, ETAPAS, PESTANAS, ayuda: null, escuchar,
+    puedeEscuchar() { return this.negocio?.escucharMensajes !== false },
     tema: leerLocal('tema', 'claro'),
     // Claro / oscuro: lo elige cada persona y queda guardado en su navegador.
     cambiarTema() {
@@ -251,6 +276,8 @@ document.addEventListener('alpine:init', () => {
       if (!this.negocio.usuarios.some((u) => u.id === this.yo)) this.yo = this.negocio.usuarios[0].id
       this.config = JSON.parse(JSON.stringify(this.negocio))
       this.config.mostrarAyuda ??= true
+      this.config.escucharMensajes ??= true
+      this.config.leerAutomatico ??= false
       this.config.whatsapp ??= { modo: 'mock', autoResponder: true, token: null, phoneNumberId: null, verifyToken: '', appSecret: null }
       await this.refrescar()
       this.ultimoAviso = leerLocal('ultimoAviso:' + this.yo, 0)
@@ -586,9 +613,10 @@ document.addEventListener('alpine:init', () => {
     guardarConfig() {
       return this.intentar('guardando', async () => {
         const { nombre, saludo, enfriaHoras, recordatorioMin, escalarTras, usuarios, catalogo, whatsapp,
-          emoji, color, botNombre, botPersonalidad, palabraVenta, palabraCliente, mostrarAyuda } = this.config
+          emoji, color, botNombre, botPersonalidad, palabraVenta, palabraCliente, mostrarAyuda, escucharMensajes, leerAutomatico } = this.config
         this.negocio = await enviarJSON('PUT', '/api/negocio', {
           nombre, saludo, enfriaHoras, recordatorioMin, escalarTras, mostrarAyuda: mostrarAyuda !== false,
+          escucharMensajes: escucharMensajes !== false, leerAutomatico: leerAutomatico === true,
           emoji: emoji || '🏪', color: color || '#0b6e4f', botNombre: botNombre || '', botPersonalidad: botPersonalidad || '',
           palabraVenta: palabraVenta || 'pedido', palabraCliente: palabraCliente || 'cliente',
           whatsapp: { ...whatsapp, token: whatsapp.token || null, appSecret: whatsapp.appSecret || null, phoneNumberId: whatsapp.phoneNumberId || null, verifyToken: whatsapp.verifyToken || '' },

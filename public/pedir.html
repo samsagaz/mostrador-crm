@@ -27,6 +27,7 @@
     .acciones button[type=submit] { flex: 1; width: auto; padding: .7rem 1rem; font-size: 1.05rem; }
     .icono { border: 1px solid var(--pico-primary); border-radius: var(--pico-border-radius); cursor: pointer; }
     .icono input { display: none; }
+    .oir { display: block; margin: .3rem 0 0; padding: .1rem .6rem; width: auto; font-size: .8rem; border-radius: 1rem; background: transparent; color: var(--pico-primary); border: 1px solid var(--pico-primary); }
     .rec { background: #c62828 !important; border-color: #c62828 !important; }
     .resumen { margin-top: 1rem; }
     .resumen li { display: flex; justify-content: space-between; list-style: none; }
@@ -47,10 +48,24 @@
       cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
       return cv.toDataURL('image/jpeg', 0.85)
     }
+    // Escuchar la respuesta del bot (voz de OpenAI; si falla, la del navegador).
+    let audioActual = null
+    async function escuchar(texto) {
+      audioActual?.pause(); window.speechSynthesis?.cancel()
+      try {
+        const r = await fetch('/api/voz', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ texto: String(texto).slice(0, 1200) }) })
+        if (!r.ok) throw new Error()
+        audioActual = new Audio(URL.createObjectURL(await r.blob()))
+        await audioActual.play()
+      } catch {
+        if (!('speechSynthesis' in window)) return
+        const u = new SpeechSynthesisUtterance(texto); u.lang = 'es-AR'; speechSynthesis.speak(u)
+      }
+    }
     document.addEventListener('alpine:init', () => {
       Alpine.data('pedir', () => ({
         negocio: null, mensajes: leerLocal('pedirMensajes', []), conversacion: leerLocal('pedirConversacion', null),
-        texto: '', ocupado: false, grabando: false, error: '', items: [], total: 0,
+        escuchar, texto: '', ocupado: false, grabando: false, error: '', items: [], total: 0,
         async init() {
           try { this.negocio = await (await revisar(await fetch('/api/publico/negocio'))).json() } catch (e) { this.error = e.message }
           if (this.negocio) {
@@ -76,6 +91,7 @@
             this.items = r.items
             this.total = r.total
             this.mensajes.push({ de: 'negocio', texto: r.respuesta })
+            if (this.negocio?.leerAutomatico) escuchar(r.respuesta)
             guardarLocal('pedirMensajes', this.mensajes)
             guardarLocal('pedirConversacion', this.conversacion)
           } catch (e) { this.error = e.message } finally { this.ocupado = false; this.bajar() }
@@ -130,7 +146,8 @@
   <p class="error" x-show="error" x-text="error" @click="error = ''"></p>
   <div class="chat" x-ref="chat">
     <div class="b negocio" x-show="!mensajes.length" x-text="'¡Hola! 👋 Soy ' + (negocio?.botNombre || 'el asistente') + '. Contame qué necesitás: podés escribir, mandar una foto de tu lista o un audio.'"></div>
-    <template x-for="(m, i) in mensajes" :key="i"><div class="b" :class="m.de" x-text="(m.de === 'negocio' ? (negocio?.emoji || '') + ' ' : '') + m.texto"></div></template>
+    <template x-for="(m, i) in mensajes" :key="i"><div class="b" :class="m.de"><span x-text="(m.de === 'negocio' ? (negocio?.emoji || '') + ' ' : '') + m.texto"></span>
+      <button class="oir" x-show="m.de === 'negocio' && negocio?.escucharMensajes" @click="escuchar(m.texto)" aria-label="Escuchar">🔊 Escuchar</button></div></template>
     <div class="b negocio pensando" x-show="ocupado" x-text="(negocio?.botNombre || 'El negocio') + ' está escribiendo…'"></div>
   </div>
   <form class="escribir" @submit.prevent="mandarTexto">

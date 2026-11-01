@@ -232,3 +232,8 @@ input[type=color] { height: 2.8rem; padding: .2rem; }
 [data-theme=dark] .kpi.riesgo small, [data-theme=dark] .kpi.riesgo span { color: #ffe0e0; }
 [data-theme=dark] .tarjeta small, [data-theme=dark] .meta { color: #9aa7b3; }
 [data-theme=dark] .aviso-cat, [data-theme=dark] .sugerido { color: #ffb066; }
+
+.oir { display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; padding: 0; margin: 0 0 0 .25rem; border-radius: 50%;
+  background: transparent; border: 1px solid currentColor; color: inherit; font-size: .8rem; vertical-align: middle; opacity: .75; cursor: pointer; }
+.oir:hover { opacity: 1; }
+.oir.texto { width: auto; border-radius: 1rem; padding: .1rem .6rem; font-size: .8rem; }

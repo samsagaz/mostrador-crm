@@ -257,6 +257,8 @@ const EdicionNegocio = type({
   'emoji?': 'string <= 16', 'color?': 'string <= 9', 'botNombre?': 'string <= 30', 'botPersonalidad?': 'string <= 600',
   'palabraVenta?': 'string <= 20', 'palabraCliente?': 'string <= 20',
   'mostrarAyuda?': 'boolean',
+  'escucharMensajes?': 'boolean',
+  'leerAutomatico?': 'boolean',
   'whatsapp?': {
     modo: "'mock' | 'real'", autoResponder: 'boolean',
     token: 'string | null', phoneNumberId: 'string | null', verifyToken: 'string <= 100', appSecret: 'string | null',
@@ -656,7 +658,33 @@ app.get('/api/publico/negocio', (c) => {
   if (!n) return c.json({ error: 'Este negocio todavía no está configurado.' }, 404)
   return c.json({ nombre: n.nombre, rubro: n.rubro, emoji: n.emoji, saludo: n.saludo, ciudad: n.ciudad,
     color: n.color || '#0b6e4f', botNombre: n.botNombre || 'Asistente', palabraVenta: n.palabraVenta || 'pedido',
-    catalogo: n.catalogo, ejemplo: n.ejemplos[0] || null })
+    catalogo: n.catalogo, ejemplo: n.ejemplos[0] || null,
+    escucharMensajes: n.escucharMensajes !== false, leerAutomatico: n.leerAutomatico === true })
+})
+
+// ---------------------------------------------------------------------------
+// Escuchar un mensaje en vez de leerlo: voz de OpenAI (rioplatense), con caché para no pagar dos veces.
+// ---------------------------------------------------------------------------
+const VOZ = {
+  model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
+  voice: 'onyx',
+  instructions: 'Voz masculina adulta, español de Argentina (rioplatense, con voseo). Tono cálido y claro, ritmo natural.',
+}
+const PedidoVoz = type({ texto: '0 < string <= 1200' })
+app.post('/api/voz', async (c) => {
+  const negocio = leerNegocio()
+  if (negocio?.escucharMensajes === false) return c.json({ error: 'Escuchar mensajes está apagado en Configuración.' }, 403)
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0].trim() || 'local'
+  if (!pasaTope(ip)) return c.json({ error: 'Pediste muchos audios seguidos. Esperá unos minutos.' }, 429)
+  const body = PedidoVoz(await c.req.json())
+  if (body instanceof type.errors) return c.json({ error: 'El texto es muy largo para escucharlo.' }, 400)
+  // Los emojis no se leen en voz alta.
+  const texto = body.texto.replace(/\p{Extended_Pictographic}|\uFE0F/gu, '').trim()
+  const b64 = await conCache('voz:' + hash([VOZ, texto]), async () => {
+    const r = await openai.audio.speech.create({ ...VOZ, input: texto, response_format: 'mp3' })
+    return Buffer.from(await r.arrayBuffer()).toString('base64')
+  })
+  return new Response(Buffer.from(b64, 'base64'), { headers: { 'content-type': 'audio/mpeg', 'cache-control': 'public, max-age=86400' } })
 })
 
 // Atiende un mensaje de un cliente (web o WhatsApp): la IA lee toda la charla, actualiza la ficha
