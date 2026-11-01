@@ -61,6 +61,26 @@ async function achicarImagen(archivo, lado = 1280) {
   return canvas.toDataURL('image/jpeg', 0.85)
 }
 
+// Personalidad visual del rubro: color principal, favicon con el ícono del rubro y título de la pestaña.
+function oscurecer(hex, k = 0.55) {
+  const n = parseInt(hex.slice(1), 16)
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k))
+  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
+}
+function aplicarTema(negocio) {
+  const raiz = document.documentElement.style
+  const color = /^#[0-9a-f]{6}$/i.test(negocio?.color || '') ? negocio.color : '#0b6e4f'
+  for (const v of ['--pico-primary', '--pico-primary-background', '--pico-primary-border']) raiz.setProperty(v, color)
+  for (const v of ['--pico-primary-hover', '--pico-primary-hover-background', '--pico-primary-hover-border']) raiz.setProperty(v, oscurecer(color, 0.8))
+  raiz.setProperty('--color-rubro', color)
+  raiz.setProperty('--color-rubro-oscuro', oscurecer(color))
+  raiz.setProperty('--pico-primary-focus', color + '40')
+  const emoji = negocio?.emoji || '🛎️'
+  let icono = document.querySelector('link[rel=icon]')
+  icono.href = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${encodeURIComponent(emoji)}</text></svg>`
+  document.title = negocio ? `${emoji} ${negocio.nombre} · Mostrador` : 'Mostrador · el CRM que no deja escapar ventas'
+}
+
 const leerLocal = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def } catch { return def } }
 const guardarLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
 
@@ -156,6 +176,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     async alArrancar() {
+      aplicarTema(this.negocio)
       if (!this.negocio.usuarios.some((u) => u.id === this.yo)) this.yo = this.negocio.usuarios[0].id
       this.config = JSON.parse(JSON.stringify(this.negocio))
       this.config.whatsapp ??= { modo: 'mock', autoResponder: true, token: null, phoneNumberId: null, verifyToken: '', appSecret: null }
@@ -216,6 +237,28 @@ document.addEventListener('alpine:init', () => {
         this.toast(`${this.negocio.emoji} ¡Listo! Tu CRM de ${this.negocio.rubro.toLowerCase()} está armado.`, 'ok')
       })
     },
+    // Cambiar de rubro desde Configuración: la IA rehace catálogo, bot, ícono y color; quedan equipo y WhatsApp.
+    nuevoRubro: { rubro: '', nombre: '', ciudad: '', listaPrecios: '', borrarVentas: true },
+    cambiarRubroIA() {
+      const r = this.nuevoRubro
+      if (r.borrarVentas && !confirm(`Se reemplazan el catálogo, el bot y las ventas de ejemplo por los de "${r.rubro}". El equipo y WhatsApp quedan. ¿Seguimos?`)) return
+      return this.intentar('ocupado', async () => {
+        this.negocio = await enviarJSON('POST', '/api/negocio/rubro', {
+          rubro: r.rubro.trim(), nombre: r.nombre.trim() || this.negocio.nombre, ciudad: r.ciudad.trim() || this.negocio.ciudad,
+          borrarVentas: r.borrarVentas, ...(r.listaPrecios.trim() ? { listaPrecios: r.listaPrecios } : {}),
+        })
+        this.config = JSON.parse(JSON.stringify(this.negocio))
+        this.nuevoRubro = { rubro: '', nombre: '', ciudad: '', listaPrecios: '', borrarVentas: true }
+        this.prioridades = null
+        aplicarTema(this.negocio)
+        await this.refrescar()
+        this.toast(`${this.negocio.emoji} ¡Listo! Ahora sos ${this.negocio.nombre}. Tu asistente se llama ${this.negocio.botNombre}.`, 'ok')
+      })
+    },
+    elegirRubroNuevo(r) {
+      this.nuevoRubro.rubro = r.rubro
+      this.nuevoRubro.nombre = r.nombre
+    },
     cambiarRubro() {
       if (!confirm('Se borran el negocio y todas sus ventas. ¿Seguimos?')) return
       return this.intentar('guardando', async () => {
@@ -223,6 +266,7 @@ document.addEventListener('alpine:init', () => {
         this.negocio = null
         this.tablero = null
         graficos = {}
+        aplicarTema(null)
       })
     },
 
@@ -450,14 +494,18 @@ document.addEventListener('alpine:init', () => {
     },
     guardarConfig() {
       return this.intentar('guardando', async () => {
-        const { nombre, saludo, enfriaHoras, recordatorioMin, escalarTras, usuarios, catalogo, whatsapp } = this.config
+        const { nombre, saludo, enfriaHoras, recordatorioMin, escalarTras, usuarios, catalogo, whatsapp,
+          emoji, color, botNombre, botPersonalidad, palabraVenta, palabraCliente } = this.config
         this.negocio = await enviarJSON('PUT', '/api/negocio', {
           nombre, saludo, enfriaHoras, recordatorioMin, escalarTras,
+          emoji: emoji || '🏪', color: color || '#0b6e4f', botNombre: botNombre || '', botPersonalidad: botPersonalidad || '',
+          palabraVenta: palabraVenta || 'pedido', palabraCliente: palabraCliente || 'cliente',
           whatsapp: { ...whatsapp, token: whatsapp.token || null, appSecret: whatsapp.appSecret || null, phoneNumberId: whatsapp.phoneNumberId || null, verifyToken: whatsapp.verifyToken || '' },
           usuarios: usuarios.map((u) => ({ ...u, telefono: u.telefono?.trim() || null })),
           catalogo: catalogo.filter((p) => p.producto.trim()).map((p) => ({ ...p, precio: p.precio === '' || p.precio == null ? null : Number(p.precio) })),
         })
         this.config = JSON.parse(JSON.stringify(this.negocio))
+        aplicarTema(this.negocio)
         await this.refrescar()
         this.toast('Guardado 👍', 'ok')
       })

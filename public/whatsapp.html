@@ -59,6 +59,9 @@
         async init() {
           try {
             this.estado = await (await revisar(await fetch('/api/wa/estado'))).json()
+            // El celular toma el color y el ícono del rubro.
+            if (/^#[0-9a-f]{6}$/i.test(this.estado.color || '')) document.documentElement.style.setProperty('--verde', this.estado.color)
+            if (this.estado.emoji) document.querySelector('link[rel=icon]').href = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${encodeURIComponent(this.estado.emoji)}</text></svg>`
             const r = await fetch('/api/publico/negocio')
             if (r.ok) this.negocio = await r.json()
           } catch (e) { this.error = e.message }
@@ -164,7 +167,7 @@
     <div class="avatar" x-text="estado?.emoji || '🏪'"></div>
     <div>
       <strong x-text="estado?.negocio || 'Negocio'"></strong>
-      <small x-text="enviando ? 'escribiendo…' : 'en línea'"></small>
+      <small x-text="enviando ? (estado?.botNombre || 'el negocio') + ' está escribiendo…' : (estado?.botNombre ? 'atiende ' + estado.botNombre + ' 🤖 · en línea' : 'en línea')"></small>
     </div>
     <button x-show="perfil" @click="salir" title="Cambiar de cliente">👤</button>
   </header>
@@ -186,7 +189,7 @@
       <template x-for="(m, i) in mensajes" :key="m.id + '-' + i">
         <div class="msg" :class="m.de"><span x-text="m.texto"></span><small x-text="hora(m.fecha) + (m.de === 'cliente' ? ' ✓✓' : '')"></small></div>
       </template>
-      <div class="msg escribiendo" x-show="enviando">escribiendo…</div>
+      <div class="msg escribiendo" x-show="enviando" x-text="(estado?.emoji || '') + ' ' + (estado?.botNombre || '') + ' está escribiendo…'"></div>
     </div>
   </template>
 

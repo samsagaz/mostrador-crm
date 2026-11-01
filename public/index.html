@@ -22,7 +22,7 @@
       <span class="logo" x-text="negocio?.emoji || '🛎️'"></span>
       <div>
         <strong x-text="negocio?.nombre || 'Mostrador'"></strong>
-        <small x-text="negocio ? negocio.rubro + ' · ' + negocio.ciudad : 'El CRM que no deja escapar ventas'"></small>
+        <small x-text="negocio ? negocio.rubro + ' · ' + negocio.ciudad + (negocio.botNombre ? ' · atiende ' + negocio.botNombre + ' 🤖' : '') : 'El CRM que no deja escapar ventas'"></small>
       </div>
     </div>
     <template x-if="negocio">
@@ -44,6 +44,7 @@
   <!-- ============ Alta: la IA adapta el CRM al rubro ============ -->
   <main class="container" x-show="cargado && !negocio">
     <article class="alta">
+      <div class="logo-alta">🛎️</div>
       <hgroup>
         <h1>Tu negocio pierde ventas en el WhatsApp. Mostrador las rescata.</h1>
         <p>Contame qué negocio tenés y la IA arma tu CRM para ese rubro: catálogo, qué datos pedirle al cliente, cuánto puede esperar antes de comprarle a otro y una página de pedidos con QR.</p>
@@ -260,6 +261,42 @@
             </template>
           </ul>
         </article>
+        <article class="rubro-config">
+          <header><strong x-text="negocio.emoji + ' Rubro y personalidad'"></strong> <small x-text="negocio.rubro"></small></header>
+          <div class="bot-tarjeta" :style="'--c:' + (config.color || '#0b6e4f')">
+            <span class="bot-avatar" x-text="config.emoji"></span>
+            <div><strong x-text="config.botNombre || 'Asistente'"></strong><small x-text="'Asistente de ' + config.nombre"></small></div>
+          </div>
+          <label>Ícono del rubro</label>
+          <div class="chips">
+            <template x-for="e in negocio.emojis || [negocio.emoji]"><button class="chip emoji" :class="{ activo: config.emoji === e }" @click="config.emoji = e" x-text="e"></button></template>
+            <input class="emoji-input" x-model="config.emoji" maxlength="4" aria-label="Otro emoji">
+          </div>
+          <div class="grid">
+            <label>Color <input type="color" x-model="config.color"></label>
+            <label>Nombre del bot <input x-model="config.botNombre"></label>
+          </div>
+          <label>Cómo habla (la IA lo usa en cada respuesta) <textarea x-model="config.botPersonalidad" rows="3"></textarea></label>
+          <div class="grid">
+            <label>A una venta le dice <input x-model="config.palabraVenta" placeholder="pedido, turno, presupuesto…"></label>
+            <label>Al cliente le dice <input x-model="config.palabraCliente" placeholder="cliente, paciente…"></label>
+          </div>
+          <label>Saludo de la página de pedidos <input x-model="config.saludo"></label>
+          <button @click="guardarConfig" :aria-busy="guardando">Guardar personalidad</button>
+          <hr>
+          <h6>🔄 Cambiar de rubro</h6>
+          <div class="chips">
+            <template x-for="r in RUBROS"><button class="chip" :class="{ activo: nuevoRubro.rubro === r.rubro }" @click="elegirRubroNuevo(r)" x-text="r.emoji + ' ' + r.rubro"></button></template>
+          </div>
+          <div class="grid">
+            <label>Nuevo rubro <input x-model="nuevoRubro.rubro" placeholder="Ej.: heladería, óptica, corralón…"></label>
+            <label>Nombre del negocio <input x-model="nuevoRubro.nombre" :placeholder="negocio.nombre"></label>
+          </div>
+          <details><summary>Lista de precios del nuevo rubro (opcional)</summary><textarea x-model="nuevoRubro.listaPrecios" rows="3"></textarea></details>
+          <label><input type="checkbox" role="switch" x-model="nuevoRubro.borrarVentas"> Reemplazar las ventas por ejemplos del nuevo rubro</label>
+          <button class="contrast" @click="cambiarRubroIA" :aria-busy="ocupado" :disabled="ocupado || !nuevoRubro.rubro.trim()">✨ Adaptar todo al nuevo rubro con IA</button>
+          <small>La IA rehace el catálogo, el bot (nombre, jerga y vocabulario), el ícono, el color y los datos que hay que pedir. El equipo, WhatsApp y las reglas de avisos quedan.</small>
+        </article>
         <article class="wa-config">
           <header><strong>💬 Conexión de WhatsApp</strong></header>
           <fieldset>
@@ -389,7 +426,7 @@
           <div>
             <div class="chat">
               <template x-for="m in sel.mensajes || []">
-                <div class="burbuja" :class="m.de"><span x-text="m.texto"></span><small x-text="hora(m.fecha) + (m.ia ? ' · IA' : '')"></small></div>
+                <div class="burbuja" :class="m.de"><span x-text="m.texto"></span><small x-text="hora(m.fecha) + (m.ia ? ' · 🤖 ' + (negocio.botNombre || 'IA') : '')"></small></div>
               </template>
             </div>
             <div role="group">

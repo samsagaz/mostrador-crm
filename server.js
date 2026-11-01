@@ -79,36 +79,81 @@ async function pedirJSON(formato, messages) {
 // ---------------------------------------------------------------------------
 const Rubro = type({
   analisis: 'string',
+  botNombre: 'string',
+  botPersonalidad: 'string',
   catalogo: type({ precio: 'number | null', producto: 'string', unidad: 'string' }).array(),
+  color: 'string',
   datosParaCerrar: 'string[]',
   ejemplos: 'string[]',
   emoji: 'string',
+  emojisAlternativos: 'string[]',
   enfriaHoras: 'number',
+  palabraCliente: 'string',
+  palabraVenta: 'string',
   saludo: 'string',
 })
 const formatoRubro = standardResponseFormat(Rubro, 'rubro')
 
-const PROMPT_RUBRO = `Sos consultor de ventas de comercios de barrio en Argentina. Te paso el nombre, el rubro y la ciudad de un negocio que hoy atiende por WhatsApp y teléfono, y a veces su lista de precios (texto o foto). Prepará su CRM.
+const PROMPT_RUBRO = `Sos consultor de ventas de comercios de barrio en Argentina. Te paso el nombre, el rubro y la ciudad de un negocio que hoy atiende por WhatsApp y teléfono, y a veces su lista de precios (texto o foto). Prepará su CRM y la personalidad de su asistente virtual.
 
 - analisis: dos frases: cómo compran los clientes de este rubro y dónde se le escapan las ventas.
-- catalogo: si te pasan una lista de precios, copiá SOLO esos productos con su precio tal cual (números, sin $ ni puntos de miles). Si no te pasan lista, proponé entre 12 y 16 productos o servicios típicos del rubro con precio null: los precios los carga el dueño, no los inventes. unidad: "u", "kg", "m", "hora", "caja", etc.
+- botNombre: un nombre corto, simpático y del rubro para el asistente que atiende el WhatsApp (ej. ferretería: "Tuerca"; rotisería: "Rosita"; veterinaria: "Firulais"; taller: "Pistón"). Sin la palabra "bot".
+- botPersonalidad: 2 o 3 frases que describen cómo habla el asistente: tono, la jerga y las palabras típicas de ESTE rubro que usa con naturalidad (ej. ferretería: habla de medidas, "te lo separo", "pasá a retirar por el mostrador"; veterinaria: pregunta por la mascota por su nombre, habla de "turno" y "consulta"). Rioplatense.
+- catalogo: si te pasan una lista de precios, copiá SOLO esos productos con su precio tal cual (números, sin $ ni puntos de miles). Si no te pasan lista, proponé entre 12 y 16 productos o servicios típicos del rubro con precio null: los precios los carga el dueño, no los inventes. unidad: "u", "kg", "m", "hora", "caja", "turno", etc.
+- color: un color hexadecimal (#rrggbb) que represente al rubro y se lea bien con texto blanco encima (oscuro o medio, nunca pastel).
 - datosParaCerrar: de 3 a 5 datos que el negocio necesita para cerrar una venta en este rubro (ej. ferretería: medidas, cantidad, retiro o envío; veterinaria: especie y peso del animal).
 - ejemplos: 3 mensajes de WhatsApp realistas de clientes de este rubro, en rioplatense, como los escribe la gente (sin tildes, abreviado). El primero un pedido claro con nombre y dirección, el segundo ambiguo (falta cantidad o medida), el tercero una consulta de precio y disponibilidad.
-- emoji: un solo emoji que represente el rubro.
+- emoji: un solo emoji que represente al rubro. emojisAlternativos: 4 emojis más que también lo representen.
 - enfriaHoras: cuántas horas puede esperar un cliente de este rubro sin respuesta antes de comprarle a otro (comida: 0.5 a 1; almacén: 2; ferretería o corralón: 6 a 24; servicios grandes: 24 a 48).
-- saludo: la primera frase que ve el cliente en la página de pedidos, cálida y corta, con el nombre del negocio.
+- palabraVenta: cómo le dice este rubro a una venta, en singular y minúscula ("pedido", "turno", "presupuesto", "encargo", "reserva"). palabraCliente: cómo le dice al cliente ("cliente", "paciente", "comensal", "vecino").
+- saludo: la primera frase que ve el cliente en la página de pedidos, cálida y corta, con el nombre del negocio y del asistente.
 - Si el rubro no es un negocio real o no se entiende, explicalo en analisis y dejá catalogo vacío.`
 
-const AltaNegocio = type({
+const DatosRubro = type({
   nombre: '0 < string <= 80',
   rubro: '0 < string <= 120',
   ciudad: 'string <= 80',
   'listaPrecios?': 'string <= 6000',
   'imagen?': /^data:image\//,
   'conEjemplos?': 'boolean',
-  'admin?': 'string <= 60',
-  'equipo?': 'string <= 300',
 })
+const AltaNegocio = DatosRubro.and({ 'admin?': 'string <= 60', 'equipo?': 'string <= 300' })
+
+const emojiValido = (e, def) => {
+  const x = [...String(e || '')].slice(0, 2).join('').trim()
+  return x && /\p{Extended_Pictographic}/u.test(x) ? x : def
+}
+const colorValido = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || '').trim()) ? String(c).trim() : '#0b6e4f')
+
+// La IA arma todo lo que depende del rubro: catálogo, personalidad del bot, ícono, color, vocabulario.
+async function armarRubro(body) {
+  const pedido = `Negocio: ${body.nombre}\nRubro: ${body.rubro}\nCiudad: ${body.ciudad || 'Rosario'}` +
+    (body.listaPrecios?.trim() ? `\n\nLista de precios:\n${body.listaPrecios.trim()}` : '\n\nNo pasó lista de precios.')
+  const contenido = body.imagen
+    ? [{ type: 'text', text: pedido + '\n\nTe paso la foto de su lista de precios.' }, { type: 'image_url', image_url: { url: body.imagen } }]
+    : pedido
+  const r = await pedirJSON(formatoRubro, [{ role: 'system', content: PROMPT_RUBRO }, { role: 'user', content: contenido }])
+  if (!r.catalogo.length) return { error: `La IA no pudo armar el negocio: ${r.analisis}` }
+  const emoji = emojiValido(r.emoji, '🏪')
+  return {
+    nombre: body.nombre.trim(),
+    rubro: body.rubro.trim(),
+    ciudad: body.ciudad?.trim() || 'Rosario',
+    analisis: r.analisis,
+    catalogo: r.catalogo.slice(0, 40).map((p) => ({ ...p, precio: p.precio == null ? null : Math.max(0, p.precio) })),
+    datosParaCerrar: r.datosParaCerrar.slice(0, 6),
+    ejemplos: r.ejemplos.slice(0, 3),
+    emoji,
+    emojis: [...new Set([emoji, ...r.emojisAlternativos.map((e) => emojiValido(e, null)).filter(Boolean)])].slice(0, 6),
+    color: colorValido(r.color),
+    botNombre: r.botNombre.trim().slice(0, 30) || 'Asistente',
+    botPersonalidad: r.botPersonalidad.trim().slice(0, 600),
+    palabraVenta: (r.palabraVenta || 'pedido').trim().toLowerCase().slice(0, 20),
+    palabraCliente: (r.palabraCliente || 'cliente').trim().toLowerCase().slice(0, 20),
+    enfriaHoras: limitar(r.enfriaHoras, 0.25, 72),
+    saludo: r.saludo,
+  }
+}
 
 const app = new Hono()
 app.use(logger())
@@ -127,24 +172,10 @@ app.get('/api/negocio', (c) => c.json(negocioPublico(leerNegocio())))
 app.post('/api/negocio', async (c) => {
   const body = AltaNegocio(await c.req.json())
   if (body instanceof type.errors) return c.json({ error: 'Completá el nombre y el rubro del negocio.' }, 400)
-  const pedido = `Negocio: ${body.nombre}\nRubro: ${body.rubro}\nCiudad: ${body.ciudad || 'Rosario'}` +
-    (body.listaPrecios?.trim() ? `\n\nLista de precios:\n${body.listaPrecios.trim()}` : '\n\nNo pasó lista de precios.')
-  const contenido = body.imagen
-    ? [{ type: 'text', text: pedido + '\n\nTe paso la foto de su lista de precios.' }, { type: 'image_url', image_url: { url: body.imagen } }]
-    : pedido
-  const r = await pedirJSON(formatoRubro, [{ role: 'system', content: PROMPT_RUBRO }, { role: 'user', content: contenido }])
-  if (!r.catalogo.length) return c.json({ error: `La IA no pudo armar el negocio: ${r.analisis}` }, 422)
+  const rubro = await armarRubro(body)
+  if (rubro.error) return c.json({ error: rubro.error }, 422)
   const negocio = {
-    nombre: body.nombre.trim(),
-    rubro: body.rubro.trim(),
-    ciudad: body.ciudad?.trim() || 'Rosario',
-    analisis: r.analisis,
-    catalogo: r.catalogo.slice(0, 40).map((p) => ({ ...p, precio: p.precio == null ? null : Math.max(0, p.precio) })),
-    datosParaCerrar: r.datosParaCerrar.slice(0, 6),
-    ejemplos: r.ejemplos.slice(0, 3),
-    emoji: [...(r.emoji || '🏪')].slice(0, 2).join(''),
-    enfriaHoras: limitar(r.enfriaHoras, 0.25, 72),
-    saludo: r.saludo,
+    ...rubro,
     // Equipo y avisos: cada venta tiene un responsable y se le avisa cada `recordatorioMin` hasta que la atienda.
     usuarios: [
       { id: 1, nombre: body.admin?.trim() || 'Dueño', rol: 'admin', telefono: null },
@@ -163,12 +194,33 @@ app.post('/api/negocio', async (c) => {
   return c.json(negocioPublico(negocio), 201)
 })
 
+// Cambiar de rubro desde Configuración: se rehace lo del rubro y quedan el equipo, WhatsApp y las reglas de avisos.
+app.post('/api/negocio/rubro', async (c) => {
+  const negocio = leerNegocio()
+  if (!negocio) return c.json({ error: 'Primero creá el negocio.' }, 400)
+  const body = DatosRubro.and({ 'borrarVentas?': 'boolean' })(await c.req.json())
+  if (body instanceof type.errors) return c.json({ error: 'Completá el nombre y el rubro.' }, 400)
+  const rubro = await armarRubro(body)
+  if (rubro.error) return c.json({ error: rubro.error }, 422)
+  const nuevo = { ...negocio, ...rubro, rubroAnterior: negocio.rubro, rubroCambiado: ahora() }
+  if (body.borrarVentas !== false) {
+    db.prepare('DELETE FROM oportunidades').run()
+    db.prepare('DELETE FROM avisos').run()
+    db.prepare('DELETE FROM wa_mensajes').run()
+  }
+  guardarNegocio(nuevo)
+  if (body.borrarVentas !== false && body.conEjemplos !== false) cargarEjemplos(nuevo)
+  return c.json(negocioPublico(nuevo))
+})
+
 const EdicionNegocio = type({
   nombre: '0 < string <= 80',
   saludo: 'string <= 300',
   enfriaHoras: '0 < number <= 72',
   recordatorioMin: '1 <= number <= 1440',
   escalarTras: '1 <= number <= 10',
+  'emoji?': 'string <= 16', 'color?': 'string <= 9', 'botNombre?': 'string <= 30', 'botPersonalidad?': 'string <= 600',
+  'palabraVenta?': 'string <= 20', 'palabraCliente?': 'string <= 20',
   'whatsapp?': {
     modo: "'mock' | 'real'", autoResponder: 'boolean',
     token: 'string | null', phoneNumberId: 'string | null', verifyToken: 'string <= 100', appSecret: 'string | null',
@@ -192,6 +244,9 @@ app.put('/api/negocio', async (c) => {
     if (body.whatsapp.modo === 'real' && !(body.whatsapp.token || process.env.WHATSAPP_TOKEN) ) return c.json({ error: 'Para la API real de WhatsApp falta el token de acceso.' }, 400)
     if (body.whatsapp.modo === 'real' && !body.whatsapp.phoneNumberId) return c.json({ error: 'Para la API real de WhatsApp falta el Phone Number ID.' }, 400)
   }
+  if ('emoji' in body) body.emoji = emojiValido(body.emoji, negocio.emoji)
+  if ('color' in body) body.color = colorValido(body.color)
+  if ('botNombre' in body) body.botNombre = body.botNombre.trim() || negocio.botNombre
   Object.assign(negocio, body)
   guardarNegocio(negocio)
   return c.json(negocioPublico(negocio))
@@ -254,7 +309,13 @@ const PROMPT_LECTURA = (n) => `Sos el asistente de ventas de un comercio. Te lle
 
 ${reglasLectura(n)}`
 
-const PROMPT_CHARLA = (n) => `Sos quien atiende el chat de pedidos de ${n.nombre}. Te paso la conversación con un cliente. Leé TODA la conversación, armá la ficha de la venta con lo último que se sabe y escribí la próxima respuesta.
+// Cómo habla el bot de este rubro (nombre, jerga, vocabulario).
+const voz = (n) => `Te llamás ${n.botNombre || 'el asistente'} y atendés el WhatsApp de ${n.nombre} (${n.rubro}, ${n.ciudad}).
+Cómo hablás: ${n.botPersonalidad || 'cálido, claro y corto, en rioplatense'}
+Vocabulario del rubro: a una venta le decís "${n.palabraVenta || 'pedido'}" y al cliente "${n.palabraCliente || 'cliente'}". Usá las palabras típicas del rubro con naturalidad, sin exagerar.`
+
+const PROMPT_CHARLA = (n) => `${voz(n)}
+Te paso la conversación con un ${n.palabraCliente || 'cliente'}. Leé TODA la conversación, armá la ficha de la venta con lo último que se sabe y escribí la próxima respuesta.
 
 ${reglasLectura(n)}
 - clienteConfirmo: true SOLO si en su último mensaje el cliente acepta explícitamente el pedido ya detallado (ej. "sí", "dale", "confirmo", "mandalo") y ya se sabe qué lleva y si retira o se envía. Si pregunta, duda, cambia algo o solo saluda: false.
@@ -466,7 +527,8 @@ app.delete('/api/oportunidades/:id', (c) => {
 const Redaccion = type({ analisis: 'string', mensaje: 'string' })
 const formatoRedaccion = standardResponseFormat(Redaccion, 'redaccion')
 
-const PROMPT_REDACCION = (n, modo) => `Sos quien atiende el WhatsApp de ${n.nombre} (${n.rubro}, ${n.ciudad}). Te paso en JSON una oportunidad de venta con los mensajes del cliente, los productos (con precio del catálogo o null) y las horas que pasaron sin respuesta.
+const PROMPT_REDACCION = (n, modo) => `${voz(n)}
+Te paso en JSON una oportunidad de venta con los mensajes del cliente, los productos (con precio del catálogo o null) y las horas que pasaron sin respuesta.
 
 ${modo === 'confirmar'
     ? `Objetivo: el cliente hizo un pedido por teléfono o en el mostrador y ahora le escribís por WhatsApp para dejarlo confirmado por escrito.
@@ -540,6 +602,7 @@ app.get('/api/publico/negocio', (c) => {
   const n = leerNegocio()
   if (!n) return c.json({ error: 'Este negocio todavía no está configurado.' }, 404)
   return c.json({ nombre: n.nombre, rubro: n.rubro, emoji: n.emoji, saludo: n.saludo, ciudad: n.ciudad,
+    color: n.color || '#0b6e4f', botNombre: n.botNombre || 'Asistente', palabraVenta: n.palabraVenta || 'pedido',
     catalogo: n.catalogo, ejemplo: n.ejemplos[0] || null })
 })
 
@@ -741,7 +804,8 @@ app.get('/api/wa-mock/chat', (c) => {
 app.get('/api/wa/estado', (c) => {
   const n = leerNegocio()
   const wa = configWa(n)
-  return c.json({ modo: wa.modo, autoResponder: wa.autoResponder, negocio: n?.nombre, emoji: n?.emoji, listo: wa.modo === 'mock' || !!(wa.token && wa.phoneNumberId) })
+  return c.json({ modo: wa.modo, autoResponder: wa.autoResponder, negocio: n?.nombre, emoji: n?.emoji,
+    color: n?.color || '#008069', botNombre: n?.botNombre || null, listo: wa.modo === 'mock' || !!(wa.token && wa.phoneNumberId) })
 })
 
 // Mandar desde el CRM por WhatsApp (MOCK → aparece en el simulador; real → Cloud API).
