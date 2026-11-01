@@ -18,9 +18,13 @@
     .b.negocio { background: #fff; align-self: flex-start; }
     .b.cliente { background: #d9fdd3; align-self: flex-end; }
     .b.pensando { color: #667781; font-style: italic; }
-    form { display: flex; gap: .4rem; margin-top: .6rem; align-items: center; }
-    form input[type=text] { margin: 0; flex: 1; }
-    form button, .icono { width: auto; margin: 0; padding: .6rem .8rem; }
+    /* El cuadro de texto ocupa todo el ancho; los botones van abajo. */
+    form.escribir { margin-top: .6rem; }
+    form.escribir textarea { width: 100%; margin: 0 0 .5rem; min-height: 5.5rem; max-height: 40vh; font-size: 1.05rem; line-height: 1.4; resize: vertical; }
+    .acciones { display: flex; gap: .5rem; align-items: stretch; }
+    .acciones > * { margin: 0 !important; }
+    .acciones .icono, .acciones button[type=button] { flex: 0 0 3.4rem; width: 3.4rem; padding: 0; display: grid; place-items: center; font-size: 1.3rem; }
+    .acciones button[type=submit] { flex: 1; width: auto; padding: .7rem 1rem; font-size: 1.05rem; }
     .icono { border: 1px solid var(--pico-primary); border-radius: var(--pico-border-radius); cursor: pointer; }
     .icono input { display: none; }
     .rec { background: #c62828 !important; border-color: #c62828 !important; }
@@ -80,6 +84,7 @@
           const t = this.texto.trim()
           if (!t) return
           this.texto = ''
+          if (this.$refs.caja) this.$refs.caja.style.height = ''
           return this.enviar({ texto: t }, t)
         },
         async foto(e) {
@@ -128,11 +133,15 @@
     <template x-for="(m, i) in mensajes" :key="i"><div class="b" :class="m.de" x-text="(m.de === 'negocio' ? (negocio?.emoji || '') + ' ' : '') + m.texto"></div></template>
     <div class="b negocio pensando" x-show="ocupado" x-text="(negocio?.botNombre || 'El negocio') + ' está escribiendo…'"></div>
   </div>
-  <form @submit.prevent="mandarTexto">
-    <label class="icono" title="Foto de tu lista">📷<input type="file" accept="image/*" @change="foto" :disabled="ocupado"></label>
-    <button type="button" class="outline" :class="{ rec: grabando }" @click="grabar" :disabled="ocupado && !grabando" x-text="grabando ? '⏹' : '🎤'" aria-label="Audio"></button>
-    <input type="text" x-model="texto" :placeholder="'Escribí tu ' + (negocio?.palabraVenta || 'pedido') + ' o consulta'" aria-label="Mensaje" :disabled="ocupado">
-    <button type="submit" :disabled="ocupado || !texto.trim()">Enviar</button>
+  <form class="escribir" @submit.prevent="mandarTexto">
+    <textarea x-model="texto" rows="3" x-ref="caja" :placeholder="'Escribí tu ' + (negocio?.palabraVenta || 'pedido') + ' o consulta…'" aria-label="Mensaje" :disabled="ocupado"
+      @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"
+      @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); mandarTexto() }"></textarea>
+    <div class="acciones">
+      <label class="icono" title="Mandar una foto de tu lista">📷<input type="file" accept="image/*" @change="foto" :disabled="ocupado"></label>
+      <button type="button" class="outline" :class="{ rec: grabando }" @click="grabar" :disabled="ocupado && !grabando" x-text="grabando ? '⏹' : '🎤'" aria-label="Grabar audio"></button>
+      <button type="submit" :disabled="ocupado || !texto.trim()" :aria-busy="ocupado">Enviar ➤</button>
+    </div>
   </form>
   <p x-show="negocio?.ejemplo && !mensajes.length"><small><a href="#" @click.prevent="texto = negocio.ejemplo; mandarTexto()">💡 Probar con un ejemplo</a></small></p>
   <article class="resumen" x-show="items.length">
