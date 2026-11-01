@@ -148,9 +148,3 @@ npm run dev   # http://localhost:3000
 
 Opcional: `WHATSAPP_TOKEN` en el `.env` en vez de cargarlo en la pantalla.
 
-## Qué haría con más tiempo
-
-- Login por usuario y permisos (hoy se elige "quién soy" arriba a la derecha).
-- Notificaciones push con la app cerrada (Web Push) y aviso por WhatsApp al empleado.
-- Plantillas de WhatsApp aprobadas para escribir fuera de la ventana de 24 h.
-- Stock real y cobro con link de pago al confirmar.
