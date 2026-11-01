@@ -55,6 +55,23 @@ const horasDesde = (iso) => (Date.now() - new Date(iso).getTime()) / 36e5
 const normalizar = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 const limitar = (n, min, max) => Math.min(max, Math.max(min, Number(n) || 0))
 
+// ArkType escribe los textos fijos como {enum} o {const} sin "type", y el modo estricto de OpenAI exige "type".
+// Se lo agregamos a todo el schema antes de mandarlo (la validación de la respuesta sigue siendo la de ArkType).
+function conTipos(nodo) {
+  if (Array.isArray(nodo)) return nodo.forEach(conTipos)
+  if (!nodo || typeof nodo !== 'object') return
+  if (!nodo.type && (nodo.enum || nodo.const !== undefined)) {
+    const valores = nodo.enum ?? [nodo.const]
+    if (valores.every((v) => typeof v === 'string')) nodo.type = 'string'
+  }
+  Object.values(nodo).forEach(conTipos)
+}
+function formato(tipo, nombre) {
+  const f = standardResponseFormat(tipo, nombre)
+  conTipos(f.json_schema.schema)
+  return f
+}
+
 function leerNegocio() {
   const fila = db.prepare('SELECT datos FROM negocio WHERE id = 1').get()
   return fila ? JSON.parse(fila.datos) : null
@@ -92,7 +109,7 @@ const Rubro = type({
   palabraVenta: 'string',
   saludo: 'string',
 })
-const formatoRubro = standardResponseFormat(Rubro, 'rubro')
+const formatoRubro = formato(Rubro, 'rubro')
 
 const PROMPT_RUBRO = `Sos consultor de ventas de comercios de barrio en Argentina. Te paso el nombre, el rubro y la ciudad de un negocio que hoy atiende por WhatsApp y teléfono, y a veces su lista de precios (texto o foto). Prepará su CRM y la personalidad de su asistente virtual.
 
@@ -278,10 +295,10 @@ const camposLectura = {
   urgencia: "'alta' | 'media' | 'baja'",
 }
 const Lectura = type(camposLectura)
-const formatoLectura = standardResponseFormat(Lectura, 'lectura')
+const formatoLectura = formato(Lectura, 'lectura')
 // La misma lectura, más la respuesta para el cliente (la página pública de pedidos).
 const Charla = type({ ...camposLectura, clienteConfirmo: 'boolean', respuesta: 'string' })
-const formatoCharla = standardResponseFormat(Charla, 'charla')
+const formatoCharla = formato(Charla, 'charla')
 
 const textoCatalogo = (n) => n.catalogo.map((p) => `- ${p.producto} (${p.unidad})${p.precio != null ? ` $${p.precio}` : ''}`).join('\n')
 
@@ -319,8 +336,8 @@ Te paso la conversación con un ${n.palabraCliente || 'cliente'}. Leé TODA la c
 
 ${reglasLectura(n)}
 - clienteConfirmo: true SOLO si en su último mensaje el cliente acepta explícitamente el pedido ya detallado (ej. "sí", "dale", "confirmo", "mandalo") y ya se sabe qué lleva y si retira o se envía. Si pregunta, duda, cambia algo o solo saluda: false.
-- respuesta: lo que le contestás al cliente ahora. Si falta algo para cerrar, pedilo; cuando ya está todo, resumí el pedido con el total y pedile que responda "SÍ" para confirmarlo. Si clienteConfirmo es true, agradecé y decile que el pedido quedó confirmado y ya lo empiezan a preparar.
-- Además, en la respuesta: rioplatense, cálido y corto (2 a 5 líneas). Confirmá lo que entendiste. Si hay productos con precio en el catálogo, decí el precio unitario tal cual figura; si no tiene precio o no está en el catálogo, decí que el negocio le confirma el precio enseguida. Hacé como mucho 2 preguntas de faltaInfo por vez. Nunca inventes precios, stock, horarios ni promociones.`
+- respuesta: lo que le contestás al cliente ahora. Los precios del catálogo son reales: decilos siempre (precio unitario y total con formato $12.345); solo si un producto no tiene precio decí que se lo confirman. Si falta algo para cerrar, pedilo; cuando ya sabés qué lleva y si retira o se envía, resumí el pedido con el total y pedile que responda "SÍ" para confirmarlo. Si clienteConfirmo es true, agradecé y decile que el pedido quedó confirmado y ya lo empiezan a preparar.
+- Además, en la respuesta: rioplatense, cálido y corto (2 a 5 líneas). Confirmá lo que entendiste. Si hay productos con precio en el catálogo, decí el precio unitario tal cual figura; si no tiene precio o no está en el catálogo, decí que el negocio le confirma el precio enseguida. Hacé como mucho 2 preguntas de faltaInfo por vez. Nunca inventes precios, stock, horarios ni promociones, y no digas que el total incluye el envío: si preguntan, el costo de envío se lo confirma el negocio.`
 
 // Le pone precio con el catálogo (no con la IA) y calcula el total.
 function conPrecios(lectura, negocio) {
@@ -540,7 +557,7 @@ app.delete('/api/oportunidades/:id', (c) => {
 // 5. Redactar: la primera respuesta o el mensaje para rescatar una venta que se enfría.
 // ---------------------------------------------------------------------------
 const Redaccion = type({ analisis: 'string', mensaje: 'string' })
-const formatoRedaccion = standardResponseFormat(Redaccion, 'redaccion')
+const formatoRedaccion = formato(Redaccion, 'redaccion')
 
 const PROMPT_REDACCION = (n, modo) => `${voz(n)}
 Te paso en JSON una oportunidad de venta con los mensajes del cliente, los productos (con precio del catálogo o null) y las horas que pasaron sin respuesta.
@@ -565,6 +582,7 @@ ${modo === 'confirmar'
 - Español rioplatense, cálido, corto: de 3 a 6 líneas. Podés usar 1 emoji como mucho.
 - Usá el nombre del cliente si lo sabés.
 - Nunca inventes precios, descuentos, stock, horarios ni promociones que no estén en el JSON.
+- El total es solo de los productos: no digas que incluye el envío.
 - analisis: una frase sobre la estrategia del mensaje. mensaje: solo el texto listo para mandar.`
 
 app.post('/api/oportunidades/:id/redactar', async (c) => {
@@ -633,7 +651,11 @@ async function atender({ negocio, op, canal, texto, imagen, telefono = null, nom
     ] }
   }
   const extra = telefono ? `\nEl cliente escribe desde WhatsApp: su teléfono es ${telefono}${nombre ? ` y su nombre de perfil es "${nombre}"` : ''}. Usalos en la ficha y no se los pidas.` : ''
-  const r = await pedirJSON(formatoCharla, [{ role: 'system', content: PROMPT_CHARLA(negocio) + extra }, ...historia])
+  // El pedido como lo calculó el sistema hasta ahora (precios del catálogo), para que el bot diga los números correctos.
+  const estado = op?.items?.length ? `\n\nPedido hasta ahora, calculado por el sistema (usá estos precios tal cual):\n` +
+    op.items.map((it) => `- ${it.cantidad} × ${it.producto}: ${it.precio == null ? 'sin precio' : `$${it.precio} c/u = $${it.subtotal}`}`).join('\n') +
+    `\nTotal: $${op.total || 0}` : ''
+  const r = await pedirJSON(formatoCharla, [{ role: 'system', content: PROMPT_CHARLA(negocio) + extra + estado }, ...historia])
   const { respuesta, clienteConfirmo, ...lectura } = r
   mensajes.push({ de: 'negocio', texto: respuesta, fecha: ahora(), ia: true })
   const nueva = { ...(op || {}), ...conPrecios(lectura, negocio), canal: op?.canal || canal, mensajes }
@@ -934,7 +956,7 @@ const Prioridades = type({
   analisis: 'string',
   prioridades: type({ accion: 'string', id: 'number', porque: 'string' }).array(),
 })
-const formatoPrioridades = standardResponseFormat(Prioridades, 'prioridades')
+const formatoPrioridades = formato(Prioridades, 'prioridades')
 
 app.post('/api/prioridades', async (c) => {
   const negocio = leerNegocio()
@@ -948,9 +970,9 @@ app.post('/api/prioridades', async (c) => {
   const r = await pedirJSON(formatoPrioridades, [
     { role: 'system', content: `Sos el gerente de ventas de ${negocio.nombre} (${negocio.rubro}). Un cliente de este rubro espera como mucho ${negocio.enfriaHoras} horas antes de comprarle a otro. Te paso las ventas abiertas en JSON.
 - prioridades: las 3 ventas que hay que atender primero (o menos si hay menos), ordenadas. Priorizá plata en juego × probabilidad, las que están en riesgo y las urgentes. id: el id exacto del JSON.
-- accion: qué hacer, en una frase con verbo y el nombre del cliente si está.
-- porque: en una frase, con números concretos del JSON (total, horas).
-- analisis: una frase con el diagnóstico del día (cuánta plata hay en riesgo y qué patrón ves).
+- accion: qué hacer, en una frase completa con verbo, el nombre del cliente y el producto (ej. "Escribirle a Lucas Ferreyra para cerrar los 2 taladros"). Nunca una sola palabra.
+- porque: en una frase, con números concretos del JSON (total con formato $12.345, horas sin respuesta).
+- analisis: una frase con el diagnóstico del día (cuánta plata hay en riesgo, con formato $12.345, y qué patrón ves).
 - No inventes ids ni montos.` },
     { role: 'user', content: JSON.stringify(datos) },
   ])
