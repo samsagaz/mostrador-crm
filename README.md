@@ -5,6 +5,44 @@ pedidos a mano, por WhatsApp o por teléfono.
 
 **Demo:** `https://dwday-1252426.online` · **Simulador de WhatsApp:** `https://dwday-1252426.online/whatsapp.html` · **Pedidos por QR:** `https://dwday-1252426.online/pedir.html` · **🎬 Videos paso a paso:** `https://dwday-1252426.online/como-funciona.html`
 
+## ✅ Todo lo que hace, de un vistazo
+
+**Se adapta a cualquier rubro**
+- 🧠 **Alta en un minuto:** elegís el rubro y la IA arma el CRM: catálogo, datos que hay que pedirle a cada cliente y cuánto tarda una venta en "enfriarse".
+- 📋 **Lista de precios en texto o foto:** la IA la copia tal cual. Si no hay lista, sugiere precios de referencia marcados como "sugerido".
+- 🤖 **Bot con personalidad del rubro:** nombre, forma de hablar, jerga y vocabulario (pedido, turno, presupuesto), editables.
+- 🎨 **Ícono y color del rubro** en la web, el bot, el simulador y la página del QR.
+- 🔄 **Cambiar de rubro** sin perder equipo ni WhatsApp, eligiendo si borrar las ventas y si cargar datos de demo.
+
+**Entran las consultas, por cualquier canal**
+- 💬 **WhatsApp con IA:** el bot responde al instante con tus precios, pide lo que falta, resume el pedido con el total y pide el "SÍ".
+- 🧪 **Modo MOCK o API real:** simulador de WhatsApp con el mismo formato que Meta para la demo; WhatsApp Cloud API real cargando el token (con firma y verificación de webhook).
+- 📱 **Página de pedidos con QR:** el cliente pide solo, a cualquier hora, por texto, foto o audio; cartel imprimible.
+- 📥 **Bandeja universal:** mensajes copiados, notas de llamadas, fotos de listas escritas a mano, **capturas de Instagram y WhatsApp** (también con Ctrl+V) y audios (Whisper).
+- 📝 **Pasarle al bot:** el empleado anota dos palabras de una llamada y el bot le escribe al cliente por WhatsApp y confirma solo.
+- 🚫 **No inventa:** precios calculados por el sistema con el catálogo, datos faltantes como preguntas, mensajes ajenos marcados como "no es venta".
+
+**Ninguna venta se pierde**
+- 🗂️ **Embudo:** Nuevo → A confirmar → Confirmado · preparar → Entregado / Perdido (con motivo), con arrastrar y soltar.
+- ✅ **Confirmación automática:** cuando el cliente dice "sí", la venta pasa sola a "Confirmado · preparar". Nada se prepara sin confirmar.
+- 👥 **Equipo y responsables:** varios usuarios (admin y vendedores); las ventas se reparten solas por carga de trabajo.
+- 🔔 **Avisos repetidos:** cada X minutos (configurable) con sonido y notificación del navegador hasta que alguien mueva la venta; si no, **escala al administrador**.
+- ⏰ **Recordatorios y notas:** "recordarme en 15 min / 1 h / mañana", notas y reasignación.
+- 🕓 **Historial de cada caso:** cada estado, aviso, nota y mensaje en la línea de tiempo del cliente.
+- 🚑 **Rescatar venta:** la IA redacta el mensaje de seguimiento con lo pedido y el total, para enviar por WhatsApp o wa.me.
+
+**Ves tus ventas en plata**
+- 📊 **Tablero:** plata enfriándose, en juego y ganada, conversión, tiempo de primera respuesta, entradas vs. cierres por día, canales y lo más pedido.
+- 🎯 **¿Por dónde empiezo hoy?** La IA prioriza las 3 ventas a atender, con el porqué.
+- 🕵️ **Demanda oculta y pérdidas:** lo que te piden y no está en el catálogo, y por qué se pierden las ventas.
+
+**Fácil de usar**
+- ❓ **Ayuda en cada sección** con explicación paso a paso y link al video (se puede ocultar).
+- 🎬 **9 videos tutoriales** con voz en off rioplatense, cursor animado y logo de DonWeb, generados solos desde la app.
+- 🔊 **Escuchar los mensajes** en vez de leerlos (voz de la IA), y lectura automática opcional en la página de pedidos.
+- 🌙 **Modo claro / oscuro**, elegido por cada persona.
+- 📲 **Funciona en el celular**, online con HTTPS en un Cloud Server de DonWeb.
+
 ## 👩‍⚖️ Guía rápida para el jurado (3 minutos)
 
 1. **Abrí https://dwday-1252426.online** — una ferretería ya cargada. Arriba, en rojo: la plata que se está enfriando.
