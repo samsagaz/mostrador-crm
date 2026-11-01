@@ -89,7 +89,7 @@ const server = spawn('node', ['server.js'], { env: { ...process.env, PORT: Strin
 process.on('exit', () => server.kill())
 for (let i = 0; i < 50; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break } catch {} await esperar(200) }
 
-const navegador = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--lang=es-AR'] })
+const navegador = await puppeteer.launch({ executablePath: CHROME, headless: true, protocolTimeout: 180_000, args: ['--no-sandbox', '--lang=es-AR'] })
 async function pagina(url) {
   const p = await navegador.newPage()
   await p.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1.5 })
