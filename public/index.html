@@ -8,6 +8,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛎️</text></svg>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
   <link rel="stylesheet" href="estilo.css">
+  <!-- Tema claro u oscuro, elegido por cada persona: se aplica antes de pintar para que no parpadee. -->
+  <script>try { const t = localStorage.getItem('tema'); if (t === '"oscuro"') document.documentElement.dataset.theme = 'dark' } catch {}</script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="app.js"></script>   <!-- antes que Alpine, para que escuche alpine:init -->
@@ -25,6 +27,9 @@
         <small x-text="negocio ? negocio.rubro + ' · ' + negocio.ciudad + (negocio.botNombre ? ' · atiende ' + negocio.botNombre + ' 🤖' : '') : 'El CRM que no deja escapar ventas'"></small>
       </div>
     </div>
+    <template x-if="!negocio">
+      <div class="acciones-barra"><button class="outline tema" @click="cambiarTema" x-text="tema === 'oscuro' ? '☀️' : '🌙'" aria-label="Cambiar tema"></button></div>
+    </template>
     <template x-if="negocio">
       <div class="acciones-barra">
         <select x-model.number="yo" @change="cambiarUsuario" aria-label="Quién está usando Mostrador">
@@ -34,6 +39,7 @@
         </select>
         <a role="button" class="outline wa-boton" href="whatsapp.html" target="_blank" rel="noopener" :title="'WhatsApp en modo ' + (negocio.whatsapp?.modo === 'real' ? 'API real' : 'MOCK')">
           <span x-text="negocio.whatsapp?.modo === 'real' ? '🟢 WhatsApp' : '🧪 WhatsApp'"></span></a>
+        <button class="outline tema" @click="cambiarTema" :title="tema === 'oscuro' ? 'Pasar a modo claro' : 'Pasar a modo oscuro'" x-text="tema === 'oscuro' ? '☀️' : '🌙'" aria-label="Cambiar tema"></button>
         <a role="button" class="outline" href="como-funciona.html" target="_blank" rel="noopener" title="Guía y videos paso a paso">❓ Ayuda</a>
         <button class="campana outline" @click="irA('equipo')" :title="'Avisos de ' + nombreYo()">
           🔔<span class="globo" x-show="avisosSinLeer" x-text="avisosSinLeer"></span>

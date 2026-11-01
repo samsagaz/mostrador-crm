@@ -158,6 +158,9 @@ const AZUL = '#0172ad', VERDE = '#2e7d32', ROJO = '#c62828', GRIS = '#90a4ae', N
 function grafico(id, config) {
   const el = document.getElementById(id)
   if (!el) return
+  const oscuro = document.documentElement.dataset.theme === 'dark'
+  Chart.defaults.color = oscuro ? '#c9d1d9' : '#555'
+  Chart.defaults.borderColor = oscuro ? '#2d3640' : '#e5e5e5'
   if (graficos[id]) { graficos[id].data = config.data; graficos[id].update(); return }
   graficos[id] = new Chart(el, { ...config, options: { maintainAspectRatio: false, plugins: { legend: { display: config.leyenda ?? false } }, ...config.options } })
 }
@@ -203,6 +206,17 @@ function dibujarQR(url, id = 'qr') {
 document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
     RUBROS, ETAPAS, PESTANAS, ayuda: null,
+    tema: leerLocal('tema', 'claro'),
+    // Claro / oscuro: lo elige cada persona y queda guardado en su navegador.
+    cambiarTema() {
+      this.tema = this.tema === 'oscuro' ? 'claro' : 'oscuro'
+      guardarLocal('tema', this.tema)
+      document.documentElement.dataset.theme = this.tema === 'oscuro' ? 'dark' : 'light'
+      // Los gráficos se rehacen con los colores del tema.
+      for (const g of Object.values(graficos)) g.destroy()
+      graficos = {}
+      if (this.pestana === 'tablero') this.$nextTick(() => dibujarGraficos(this.tablero))
+    },
     verAyuda(k) { this.ayuda = AYUDA[k] }, ICONO_CANAL, TIPOS, COMO_USA_IA, linkWa,
     cargado: false, negocio: null, config: null, tablero: null, ops: [],
     pestana: leerLocal('pestana', 'bandeja'), yo: leerLocal('yo', 1),

@@ -181,3 +181,30 @@ input[type=color] { height: 2.8rem; padding: .2rem; }
 .ayuda-caja footer { display: flex; gap: .5rem; } .ayuda-caja footer > * { margin: 0; }
 
 .sugerido { display: block; color: var(--naranja); font-size: .72rem; }
+
+/* ---------- Modo oscuro (Pico pone sus colores; acá los de Mostrador) ---------- */
+[data-theme=dark] { --fondo-suave: #0f1417; }
+[data-theme=dark] body { background: var(--fondo-suave); }
+[data-theme=dark] .kpi, [data-theme=dark] .tarjeta, [data-theme=dark] .como-ia, [data-theme=dark] .chip { background: #1a2127; color: #e6edf3; }
+[data-theme=dark] .kpi.riesgo { background: linear-gradient(135deg, #8e1717, #c62828); }
+[data-theme=dark] .columna { background: #151b20; }
+[data-theme=dark] .columna.perdido { background: #241719; }
+[data-theme=dark] .columna.confirmado, [data-theme=dark] .columna.entregado { background: #13221a; }
+[data-theme=dark] .tarjeta.riesgo { background: #2a1517; }
+[data-theme=dark] .ia { background: #12241d; }
+[data-theme=dark] .falta { background: #2a2414; }
+[data-theme=dark] .grid-ia > div { background: #151b20; }
+[data-theme=dark] .chat { background: #0d1916; }
+[data-theme=dark] .burbuja.cliente { background: #202c33; color: #e6edf3; }
+[data-theme=dark] .burbuja.negocio { background: #005c4b; color: #e6edf3; }
+[data-theme=dark] .burbuja.nota { background: #3a3214; color: #f3e6b0; }
+[data-theme=dark] .etiqueta { background: #26313a; color: #e6edf3; }
+[data-theme=dark] .etiqueta.pedido { background: #12402c; } [data-theme=dark] .etiqueta.presupuesto { background: #1d2f55; }
+[data-theme=dark] .etiqueta.reclamo, [data-theme=dark] .etiqueta.rojo, [data-theme=dark] .etiqueta.u-alta { background: #4a1517; color: #ffb4b4; }
+[data-theme=dark] .etiqueta.u-media { background: #3d3214; }
+[data-theme=dark] .pestanas { border-bottom-color: #26313a; }
+[data-theme=dark] .qr svg { background: #fff; padding: 6px; border-radius: 8px; }
+[data-theme=dark] .linea-tiempo { border-left-color: #2d3640; }
+.tema { padding: .35rem .6rem !important; }
+[data-theme=dark] .pestanas button.activa { color: #fff; }
+[data-theme=dark] a:not([role=button]) { color: #8cc8ff; }
