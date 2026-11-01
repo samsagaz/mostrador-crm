@@ -31,6 +31,7 @@ const MOTIVOS = ['Le respondimos tarde', 'Precio', 'No teníamos stock', 'Compr�
 
 const COMO_USA_IA = `
 <h3>🧠 Cómo usa la IA</h3>
+<p><a href="como-funciona.html" target="_blank" rel="noopener">▶️ Ver el video y el flujo completo, paso a paso</a></p>
 <div class="grid-ia">
   <div><b>1. Se adapta a tu rubro.</b> Le decís "ferretería" o "rotisería" y arma el catálogo (con tu lista de precios, en texto o foto), los datos que hay que pedirle a cada cliente y cuántas horas aguanta un cliente de ese rubro antes de comprarle a otro.</div>
   <div><b>2. Lee cualquier mensaje.</b> Texto de WhatsApp, la nota de una llamada, la foto de una lista escrita a mano o un audio (Whisper lo pasa a texto). Devuelve una ficha <b>estructurada y validada</b> con ArkType: cliente, productos, tipo, urgencia, probabilidad de compra y próxima acción.</div>

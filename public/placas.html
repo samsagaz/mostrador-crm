@@ -1,0 +1,114 @@
+<!doctype html>
+<!-- Placas del video tutorial (1280×720 cada una). Se capturan una por una y se arma el video con ffmpeg. -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Placas del video · Mostrador</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --naranja: #ff6a00; --oscuro: #1d1d1f; --verde: #0b6e4f; }
+    * { box-sizing: border-box; margin: 0; }
+    body { background: #444; font-family: Inter, system-ui, sans-serif; display: grid; gap: 20px; padding: 20px; justify-content: center; }
+    .placa { width: 1280px; height: 720px; position: relative; overflow: hidden; background: #fff; color: var(--oscuro); padding: 70px 90px; }
+    .placa .marca { position: absolute; right: 40px; bottom: 28px; height: 48px; border-radius: 8px; }
+    .placa .paso { position: absolute; left: 90px; bottom: 34px; color: #999; font-size: 20px; }
+    h1 { font-size: 64px; font-weight: 800; line-height: 1.05; letter-spacing: -1px; }
+    h2 { font-size: 46px; font-weight: 800; margin-bottom: 36px; letter-spacing: -.5px; }
+    .sub { font-size: 28px; color: #555; margin-top: 18px; }
+    .naranja { color: var(--naranja); }
+    .portada { background: linear-gradient(135deg, #ff6a00, #ff8f3d); color: #fff; display: flex; flex-direction: column; justify-content: center; }
+    .portada .sub { color: #fff; opacity: .9; }
+    .portada .icono { font-size: 90px; margin-bottom: 20px; }
+    .lista { display: grid; gap: 22px; font-size: 30px; }
+    .lista div { display: flex; gap: 20px; align-items: flex-start; }
+    .lista b { color: var(--naranja); }
+    .num { flex: none; width: 52px; height: 52px; border-radius: 50%; background: var(--naranja); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 26px; }
+    .tec { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 40px; }
+    .tec div { background: #f6f6f7; border-radius: 16px; padding: 18px 22px; font-size: 24px; }
+    .tec b { display: block; font-size: 26px; margin-bottom: 4px; }
+    .tec small { color: #666; }
+    .flujo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; align-items: stretch; margin-top: 10px; }
+    .flujo div { background: #fff4ec; border: 3px solid var(--naranja); border-radius: 18px; padding: 18px 14px; text-align: center; font-size: 21px; position: relative; }
+    .flujo div .e { font-size: 46px; display: block; margin-bottom: 8px; }
+    .flujo div:not(:last-child)::after { content: '➜'; position: absolute; right: -24px; top: 42%; color: var(--naranja); font-size: 26px; z-index: 2; }
+    .flujo div.ok { background: #e7f6ee; border-color: #2e7d32; }
+    .red { margin-top: 34px; display: flex; gap: 18px; }
+    .red div { flex: 1; background: #fdeaea; border-radius: 14px; padding: 16px 20px; font-size: 21px; }
+    .red b { color: #c62828; }
+    .cierre { background: var(--oscuro); color: #fff; display: flex; flex-direction: column; justify-content: center; }
+    .cierre .sub { color: #ccc; }
+    .grande { font-size: 120px; }
+    body.una { padding: 0; display: block; background: #fff; }
+    body.una .placa { display: none; } body.una .placa.ver { display: block; }
+    body.una .portada.ver, body.una .cierre.ver { display: flex; }
+  </style>
+  <script>
+    // placas.html?p=p-flujo muestra solo esa placa, a pantalla completa (para capturarla).
+    addEventListener('DOMContentLoaded', () => {
+      const id = new URLSearchParams(location.search).get('p')
+      if (!id) return
+      document.body.classList.add('una')
+      document.getElementById(id)?.classList.add('ver')
+    })
+  </script>
+</head>
+<body>
+
+<section class="placa portada" id="p-portada">
+  <div class="icono">🛎️</div>
+  <h1>Mostrador:<br>el CRM que no deja<br>escapar ventas</h1>
+  <p class="sub">Cómo funciona, paso a paso · en 2 minutos</p>
+  <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
+</section>
+
+<section class="placa" id="p-problema">
+  <h2>¿Dónde se pierden las ventas?</h2>
+  <div class="lista">
+    <div><span class="num">1</span><span><b>Nadie contesta a tiempo.</b> El cliente escribe por WhatsApp, estás atendiendo, y a las 2 horas ya le compró a otro.</span></div>
+    <div><span class="num">2</span><span><b>Nadie hace el seguimiento.</b> "Te paso el precio"… y nadie vuelve a escribir.</span></div>
+    <div><span class="num">3</span><span><b>Nadie sabe cuánta plata se fue.</b> Sin registro, lo que no se ve no se arregla.</span></div>
+  </div>
+  <p class="sub" style="margin-top:40px">Mostrador ataca las tres cosas, para <b class="naranja">cualquier rubro</b>.</p>
+  <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
+</section>
+
+<section class="placa" id="p-tecnologia">
+  <h2>Las tecnologías, en pocas palabras</h2>
+  <div class="tec">
+    <div><b>🧠 OpenAI + ArkType</b><small>La IA lee los mensajes y responde en un formato fijo y validado: no inventa precios ni datos.</small></div>
+    <div><b>🎤 Whisper</b><small>Convierte los audios de WhatsApp en texto.</small></div>
+    <div><b>💬 WhatsApp Cloud API</b><small>Recibe y manda mensajes. En modo demo, un simulador usa el mismo formato.</small></div>
+    <div><b>⚙️ Node 22 + Hono</b><small>El servidor: un solo programa liviano, sin pasos de compilación.</small></div>
+    <div><b>🗄️ SQLite</b><small>Guarda negocio, ventas, historial y avisos en un archivo.</small></div>
+    <div><b>☁️ DonWeb Cloud Server</b><small>Lo publica en internet con HTTPS (Caddy + pm2).</small></div>
+  </div>
+  <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
+</section>
+
+<section class="placa" id="p-flujo">
+  <h2>El flujo completo de una venta</h2>
+  <div class="flujo">
+    <div><span class="e">📲</span>El cliente escribe por <b>WhatsApp</b>, el <b>QR</b> o <b>llama</b></div>
+    <div><span class="e">🧠</span>La IA arma la ficha con <b>tus precios</b> y lo que falta</div>
+    <div><span class="e">🤖</span>El bot responde con la jerga del rubro y <b>pide confirmación</b></div>
+    <div><span class="e">✅</span>El cliente dice <b>"SÍ"</b>: pasa a <b>Confirmado · preparar</b></div>
+    <div class="ok"><span class="e">📦</span><b>Entregado</b> y queda en el tablero</div>
+  </div>
+  <div class="red">
+    <div><b>🔔 Avisos:</b> si nadie mueve la venta, le avisa al responsable cada X minutos.</div>
+    <div><b>⬆️ Escala:</b> si sigue quieta, le avisa también al administrador.</div>
+    <div><b>🚑 Rescate:</b> la IA escribe el mensaje para recuperar la venta.</div>
+  </div>
+  <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
+</section>
+
+<section class="placa cierre" id="p-cierre">
+  <div class="grande">🛎️</div>
+  <h1>Ninguna venta<br><span class="naranja">sin respuesta.</span></h1>
+  <p class="sub" id="url-cierre">Probalo: abrí Mostrador, elegí tu rubro y escribile desde el simulador de WhatsApp.</p>
+  <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
+</section>
+
+</body>
+</html>

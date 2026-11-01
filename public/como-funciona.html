@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cómo funciona · Mostrador</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛎️</text></svg>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+  <style>
+    :root { --pico-primary: #ff6a00; --pico-primary-background: #ff6a00; --pico-primary-border: #ff6a00; --pico-primary-hover-background: #e55f00; }
+    body { background: #f6f6f7; }
+    .cabecera { background: linear-gradient(135deg, #ff6a00, #ff8f3d); color: #fff; padding: 2.5rem 1rem; text-align: center; }
+    .cabecera h1 { color: #fff; margin-bottom: .3rem; }
+    .cabecera img { height: 40px; border-radius: 6px; margin-top: 1rem; }
+    main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem; }
+    video { width: 100%; border-radius: 14px; box-shadow: 0 8px 30px #0003; background: #000; }
+    .tec { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+    .tec article { margin: 0; }
+    .tec b { display: block; }
+    ol.flujo li { margin-bottom: .6rem; }
+  </style>
+</head>
+<body>
+  <header class="cabecera">
+    <h1>🛎️ Mostrador</h1>
+    <p>El CRM que no deja escapar ventas · cómo funciona, paso a paso</p>
+    <img src="img/donweb-marca.jpg" alt="DonWeb">
+  </header>
+  <main>
+    <video controls preload="metadata" poster="video/poster.jpg" src="video/tutorial.mp4"></video>
+    <p><small>¿No se ve? <a href="video/tutorial.mp4" download>Descargá el video</a> · <a href="/">Abrir Mostrador</a> · <a href="whatsapp.html">Simulador de WhatsApp</a></small></p>
+
+    <h2>El flujo completo</h2>
+    <ol class="flujo">
+      <li><b>Elegís tu rubro</b> (ferretería, rotisería, veterinaria…). La IA arma el catálogo (o lo lee de tu lista o de una foto), el bot con su nombre y su jerga, el ícono, el color y qué datos pedirle a cada cliente.</li>
+      <li><b>Te escriben</b> por WhatsApp, por la página del QR o te llaman. Si te llaman, anotás dos palabras y tocás <b>🤖 Pasarle al bot</b>.</li>
+      <li><b>La IA arma la ficha</b>: quién es, qué pide, el total con <i>tus</i> precios, qué falta preguntar y qué tan cerca está de comprar.</li>
+      <li><b>El bot responde</b> al toque, pide lo que falta y al final pide que el cliente diga <b>"SÍ"</b>.</li>
+      <li><b>El cliente confirma</b> y la venta pasa sola a <b>Confirmado · a preparar</b>. Al responsable le llega un aviso. Nada se prepara sin confirmar.</li>
+      <li><b>Si una venta se queda quieta</b>, le avisa a su responsable cada X minutos (con sonido y notificación). Si sigue sin moverse, le avisa también al administrador. Con <b>🚑 Rescatar</b>, la IA escribe el mensaje para recuperarla.</li>
+      <li><b>El tablero</b> muestra la plata: cuánto se está enfriando, cuánto hay en juego, cuánto se ganó, por qué se pierden las ventas y qué te piden que no tenés.</li>
+    </ol>
+
+    <h2>Las tecnologías, en pocas palabras</h2>
+    <div class="tec">
+      <article><b>🧠 OpenAI + ArkType</b><small>La IA responde en un formato fijo y validado. Los precios salen de tu catálogo, nunca de la IA. Si falta un dato, pregunta en vez de inventar.</small></article>
+      <article><b>🎤 Whisper</b><small>Pasa a texto los audios de WhatsApp (también los .opus).</small></article>
+      <article><b>💬 WhatsApp Cloud API</b><small>Recibe y manda mensajes por webhook. En modo MOCK, un simulador manda el mismo JSON que Meta, así la demo usa el mismo código que la versión real.</small></article>
+      <article><b>⚙️ Node 22 + Hono</b><small>Servidor liviano, sin compilación: se actualiza con <code>git pull</code>.</small></article>
+      <article><b>🗄️ SQLite</b><small>Negocio, ventas, historial de cada caso, avisos y caché de la IA, en un solo archivo.</small></article>
+      <article><b>🖥️ Alpine.js + Pico CSS + Chart.js</b><small>La pantalla, liviana, que también anda en el celular.</small></article>
+      <article><b>☁️ DonWeb Cloud Server</b><small>Publicado con HTTPS (Caddy) y siempre encendido (pm2).</small></article>
+    </div>
+  </main>
+</body>
+</html>
