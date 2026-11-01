@@ -60,10 +60,29 @@ tablero, QR y modo MOCK/API real). Se generan solos con `node scripts/videos.mjs
 la maneja con Chrome (puppeteer-core), saca las capturas con un rótulo por paso, genera la voz con `gpt-4.1-tts`
 y arma cada video con ffmpeg.
 
-## Stack
+## Tecnologías y por qué las elegimos
 
-Node 22 + Hono, better-sqlite3, SDK oficial de OpenAI + ArkType, Alpine.js + Pico CSS + Chart.js (sin build).
-Deploy: Cloud Server de DonWeb con pm2 y Caddy (HTTPS).
+El criterio fue uno solo: **que un comercio de barrio lo pueda usar mañana**. Barato de correr, simple de mantener,
+rápido en un celular viejo y sin depender de servicios caros. Y que se pueda deployar en minutos.
+
+| Capa | Tecnología | Por qué |
+| --- | --- | --- |
+| IA | **OpenAI `gpt-4.1`** con salida estructurada | Lee mensajes desordenados (rioplatense, abreviado, con faltas) y devuelve siempre el mismo JSON. Probamos `gpt-4o-mini`, `gpt-4.1-mini`, `gpt-4.1` y `gpt-5.4-mini` con los mismos mensajes: `gpt-4.1` fue el único que acertó cliente, dirección y forma de entrega en todos los casos, en unos 2 segundos. |
+| Validación | **ArkType** + `standardResponseFormat` | Un mismo tipo arma el JSON Schema estricto que va a OpenAI **y** valida la respuesta en el servidor. Si la IA devuelve algo que no cumple, no entra al CRM. Una sola fuente de verdad, sin duplicar esquemas. |
+| Voz → texto | **Whisper** (`whisper-1`) | Los clientes mandan audios de WhatsApp: Whisper los transcribe bien en español, incluidos los `.opus`. |
+| Voz de los videos | **`gpt-4o-mini-tts`** (voz *onyx*) | Permite indicar acento y tono ("rioplatense con voseo, cálido"), así los tutoriales suenan locales y no a traductor. |
+| Servidor | **Node 22 + Hono** | Hono es mínimo y rápido, sirve la API y los archivos con el mismo proceso. Sin paso de build: el deploy es `git pull` y reiniciar. |
+| Base de datos | **SQLite** (better-sqlite3) | Un archivo, cero administración, ideal para un comercio. Guardamos cada venta como JSON entero en una columna: el esquema puede cambiar sin migraciones. También sirve de caché de la IA (repetir una demo no gasta la key). |
+| Pantalla | **Alpine.js + Pico CSS** | Interactividad sin framework pesado ni compilación: la página carga rápido en cualquier celular. Pico da un diseño prolijo, accesible y con modo oscuro de base. |
+| Gráficos | **Chart.js** | Liviano y suficiente para el tablero (embudo, días, canales, productos). |
+| QR | **qrcode-generator** | Genera el QR en el navegador, sin depender de un servicio externo. |
+| WhatsApp | **WhatsApp Cloud API** (webhook) + simulador | Es la API oficial de Meta. El simulador manda el **mismo JSON** que Meta al mismo webhook, así la demo corre exactamente el código de producción; pasar a real es cargar el token. |
+| Hosting | **Cloud Server de DonWeb** (Debian 13) | Servidor propio, en Argentina, con costo fijo y sin vendor lock-in. |
+| Procesos y HTTPS | **pm2 + Caddy** | pm2 mantiene la app viva y la levanta si el server se reinicia. Caddy saca y renueva solo el certificado HTTPS (Let's Encrypt), necesario para micrófono, notificaciones y portapapeles. |
+| Videos | **puppeteer-core + ffmpeg** | Un script maneja la app real con Chrome, captura cada paso, agrega cursor y voz, y arma los videos. Si la app cambia, los tutoriales se regeneran con un comando. |
+
+**Lo que dejamos afuera a propósito:** frameworks con build (React, Next), bases con servidor (Postgres) y servicios
+pagos de terceros. Para este problema sumaban complejidad y costo sin mejorar lo que ve el comerciante.
 
 ## Correrlo
 
