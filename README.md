@@ -5,6 +5,18 @@ pedidos a mano, por WhatsApp o por teléfono.
 
 **Demo:** `https://dwday-1252426.online` · **Simulador de WhatsApp:** `https://dwday-1252426.online/whatsapp.html` · **Pedidos por QR:** `https://dwday-1252426.online/pedir.html` · **🎬 Videos paso a paso:** `https://dwday-1252426.online/como-funciona.html`
 
+## 👩‍⚖️ Guía rápida para el jurado (3 minutos)
+
+1. **Abrí https://dwday-1252426.online** — una ferretería ya cargada. Arriba, en rojo: la plata que se está enfriando.
+2. **Escribile por WhatsApp:** abrí https://dwday-1252426.online/whatsapp.html en tu celular (o escaneá el QR en *QR y catálogo*), pedí algo ("hola, tienen cemento? quiero 4 bolsas") y respondé "sí" cuando el bot pida confirmar. En el CRM, la venta cae sola en el **Embudo** y pasa a **Confirmado · preparar**.
+3. **Bandeja → Probar con un ejemplo** o pegá cualquier mensaje: la IA arma la ficha con los precios del catálogo y dice qué falta preguntar. Probá también un mensaje que no tenga nada que ver.
+4. **🤖 Pasarle al bot:** escribí "llamó Ana 341 555 1234, 2 llaves térmicas, retira" y tocá el botón.
+5. **Tablero → Preguntarle a la IA:** las 3 ventas a atender primero, con el porqué.
+6. **⚙️ Configuración → Cambiar de rubro:** escribí cualquier rubro y la IA adapta catálogo, bot, ícono y color.
+7. **Videos de 30-60 s de cada flujo:** https://dwday-1252426.online/como-funciona.html
+
+**Qué mirar en el código:** `server.js` (tipos de ArkType + un prompt con una regla por campo, precios calculados por el sistema y no por la IA, webhook de WhatsApp, avisos con escalamiento) y `public/app.js`.
+
 ## El problema, de raíz
 
 En un comercio de barrio las ventas no se pierden por falta de clientes. Se pierden en el camino:
