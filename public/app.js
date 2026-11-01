@@ -42,6 +42,40 @@ const COMO_USA_IA = `
 </div>
 <p><small>Modelo de OpenAI con salida estructurada (JSON Schema estricto) validada en el servidor con el mismo tipo. Las respuestas se guardan en caché: repetir una demo no gasta la key. La key vive solo en el servidor.</small></p>`
 
+// Ayuda de cada sección (el ícono ❓). `video` es el id del video en como-funciona.html.
+const AYUDA = {
+  bandeja: { titulo: '📥 Bandeja: llegó un mensaje', video: 'leer-mensajes',
+    texto: 'Acá entra todo lo que no llega solo por WhatsApp: mensajes copiados, notas de llamadas, fotos, capturas y audios.',
+    pasos: ['Elegí el canal (WhatsApp, teléfono, Instagram, mostrador).', 'Pegá el mensaje y tocá 🧠 Leer con IA, o subí una foto, una captura de Instagram/WhatsApp o un audio. También podés pegar una captura con Ctrl+V.', 'Revisá la ficha (cliente, productos, total, qué falta) y tocá Mandar al embudo.', '¿Te llamaron? Anotá en dos palabras qué pidió y su celular, y tocá 🤖 Pasarle al bot: le escribe por WhatsApp y confirma solo.'] },
+  embudo: { titulo: '🗂️ Embudo de ventas', video: 'avisos-y-seguimiento',
+    texto: 'Cada venta en su etapa: Nuevo → A confirmar → Confirmado · preparar → Entregado (o Perdido). Las que esperan demasiado se ponen en rojo.',
+    pasos: ['Arrastrá una tarjeta a otra columna para cambiarle el estado, o tocála para abrir el detalle.', 'Usá "Solo las mías" para ver lo que tenés asignado y "Solo las que se enfrían" para lo urgente.', 'Las tarjetas que tiemblan tienen un aviso pendiente.'] },
+  detalle: { titulo: '🧾 Detalle de la venta', video: 'avisos-y-seguimiento',
+    texto: 'Todo el caso del cliente en un lugar: productos, total, charla, responsable e historial.',
+    pasos: ['Cambiá el estado con los botones de arriba (si se pierde, te pregunta el motivo).', '✍️ Redactar respuesta o 🚑 Rescatar venta: la IA escribe el mensaje; mandalo por WhatsApp o copialo.', 'Reasigná el responsable o agendá un recordatorio (15 min, 1 h, mañana).', 'Dejá notas: todo queda en el historial.'] },
+  tablero: { titulo: '📊 Tablero', video: 'tablero',
+    texto: 'Tus ventas en plata: cuánto se enfría, cuánto está en juego, cuánto ganaste y cuánto tardás en responder.',
+    pasos: ['Tocá "Preguntarle a la IA" para saber por qué ventas empezar hoy.', 'Mirá por qué canal llegan y qué se vende más.', '"Te lo piden y no está en tu catálogo" muestra demanda que no estás viendo.'] },
+  avisos: { titulo: '🔔 Avisos', video: 'avisos-y-seguimiento',
+    texto: 'Si una venta no se mueve, su responsable recibe un aviso cada X minutos, con sonido y notificación, hasta que la atienda.',
+    pasos: ['Elegí arriba a la derecha quién sos: cada uno ve sus avisos.', 'Tocá "Activar notificaciones" para recibirlos aunque estés en otra pestaña.', 'Tocá un aviso para abrir la venta.'] },
+  reglas: { titulo: '⚙️ Reglas de seguimiento y equipo', video: 'avisos-y-seguimiento',
+    texto: 'Definí cada cuánto avisar, cuándo escalar al administrador y quién es tu equipo.',
+    pasos: ['"Avisarle cada X minutos": la frecuencia de los avisos.', '"Después de N avisos": cuándo se le avisa también al administrador.', 'Sumá personas al equipo: las ventas nuevas se reparten entre ellas.'] },
+  whatsapp: { titulo: '💬 Conexión de WhatsApp', video: 'whatsapp-config',
+    texto: 'Elegí de dónde llegan los mensajes de WhatsApp.',
+    pasos: ['MOCK (demo): probalo con el simulador (botón 🧪 WhatsApp de arriba).', 'API real: cargá el token y el Phone Number ID de WhatsApp Cloud API y configurá el webhook en Meta.', 'Con "La IA contesta sola", el bot atiende y pide la confirmación; si lo apagás, arma la ficha y contesta una persona.'] },
+  rubro: { titulo: '🧠 Rubro y personalidad del bot', video: 'alta-y-rubro',
+    texto: 'El asistente habla como tu rubro: nombre, forma de hablar, vocabulario, ícono y color.',
+    pasos: ['Editá el nombre del bot, cómo habla y cómo le dice a una venta y al cliente; tocá Guardar personalidad.', 'Para cambiar de rubro, elegilo abajo y tocá ✨ Adaptar todo: la IA rehace catálogo, bot, ícono y color.', 'Tu equipo, WhatsApp y las reglas de avisos se mantienen.'] },
+  qr: { titulo: '📱 QR de pedidos', video: 'qr',
+    texto: 'Una página donde tus clientes piden solos, a cualquier hora, atendidos por tu asistente.',
+    pasos: ['Imprimí el cartel y pegalo en el mostrador, o copiá el link para Instagram.', 'Cada pedido cae solo en el embudo con su responsable y sus avisos.'] },
+  catalogo: { titulo: '📦 Catálogo y precios', video: 'alta-y-rubro',
+    texto: 'La IA usa estos precios para cotizar. Nunca inventa precios: si un producto no tiene precio, avisa que se confirma.',
+    pasos: ['Editá precios y productos y tocá Guardar precios.', 'Lo que te piden y no está acá aparece en el tablero.'] },
+}
+
 // Si la respuesta no es 2xx, tira un error con el mensaje del server.
 async function revisar(r) {
   if (r.ok) return r
@@ -155,7 +189,8 @@ function dibujarQR(url, id = 'qr') {
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
-    RUBROS, ETAPAS, PESTANAS, ICONO_CANAL, TIPOS, COMO_USA_IA, linkWa,
+    RUBROS, ETAPAS, PESTANAS, ayuda: null,
+    verAyuda(k) { this.ayuda = AYUDA[k] }, ICONO_CANAL, TIPOS, COMO_USA_IA, linkWa,
     cargado: false, negocio: null, config: null, tablero: null, ops: [],
     pestana: leerLocal('pestana', 'bandeja'), yo: leerLocal('yo', 1),
     alta: { rubro: '', nombre: '', ciudad: 'Rosario', admin: '', equipo: '', listaPrecios: '', imagen: null, conEjemplos: true },
@@ -180,6 +215,7 @@ document.addEventListener('alpine:init', () => {
       aplicarTema(this.negocio)
       if (!this.negocio.usuarios.some((u) => u.id === this.yo)) this.yo = this.negocio.usuarios[0].id
       this.config = JSON.parse(JSON.stringify(this.negocio))
+      this.config.mostrarAyuda ??= true
       this.config.whatsapp ??= { modo: 'mock', autoResponder: true, token: null, phoneNumberId: null, verifyToken: '', appSecret: null }
       await this.refrescar()
       this.ultimoAviso = leerLocal('ultimoAviso:' + this.yo, 0)
@@ -512,9 +548,9 @@ document.addEventListener('alpine:init', () => {
     guardarConfig() {
       return this.intentar('guardando', async () => {
         const { nombre, saludo, enfriaHoras, recordatorioMin, escalarTras, usuarios, catalogo, whatsapp,
-          emoji, color, botNombre, botPersonalidad, palabraVenta, palabraCliente } = this.config
+          emoji, color, botNombre, botPersonalidad, palabraVenta, palabraCliente, mostrarAyuda } = this.config
         this.negocio = await enviarJSON('PUT', '/api/negocio', {
-          nombre, saludo, enfriaHoras, recordatorioMin, escalarTras,
+          nombre, saludo, enfriaHoras, recordatorioMin, escalarTras, mostrarAyuda: mostrarAyuda !== false,
           emoji: emoji || '🏪', color: color || '#0b6e4f', botNombre: botNombre || '', botPersonalidad: botPersonalidad || '',
           palabraVenta: palabraVenta || 'pedido', palabraCliente: palabraCliente || 'cliente',
           whatsapp: { ...whatsapp, token: whatsapp.token || null, appSecret: whatsapp.appSecret || null, phoneNumberId: whatsapp.phoneNumberId || null, verifyToken: whatsapp.verifyToken || '' },

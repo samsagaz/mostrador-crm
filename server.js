@@ -251,6 +251,7 @@ const EdicionNegocio = type({
   escalarTras: '1 <= number <= 10',
   'emoji?': 'string <= 16', 'color?': 'string <= 9', 'botNombre?': 'string <= 30', 'botPersonalidad?': 'string <= 600',
   'palabraVenta?': 'string <= 20', 'palabraCliente?': 'string <= 20',
+  'mostrarAyuda?': 'boolean',
   'whatsapp?': {
     modo: "'mock' | 'real'", autoResponder: 'boolean',
     token: 'string | null', phoneNumberId: 'string | null', verifyToken: 'string <= 100', appSecret: 'string | null',

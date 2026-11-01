@@ -34,6 +34,7 @@
         </select>
         <a role="button" class="outline wa-boton" href="whatsapp.html" target="_blank" rel="noopener" :title="'WhatsApp en modo ' + (negocio.whatsapp?.modo === 'real' ? 'API real' : 'MOCK')">
           <span x-text="negocio.whatsapp?.modo === 'real' ? '🟢 WhatsApp' : '🧪 WhatsApp'"></span></a>
+        <a role="button" class="outline" href="como-funciona.html" target="_blank" rel="noopener" title="Guía y videos paso a paso">❓ Ayuda</a>
         <button class="campana outline" @click="irA('equipo')" :title="'Avisos de ' + nombreYo()">
           🔔<span class="globo" x-show="avisosSinLeer" x-text="avisosSinLeer"></span>
         </button>
@@ -105,7 +106,7 @@
     <section x-show="pestana === 'bandeja'">
       <div class="dos">
         <article>
-          <header><strong>📥 Llegó un mensaje</strong> <small>Pegalo de WhatsApp, anotá la llamada, subí la foto de la lista o grabá el audio.</small></header>
+          <header><strong>📥 Llegó un mensaje <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('bandeja')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></strong> <small>Pegalo de WhatsApp, anotá la llamada, subí la foto de la lista o grabá el audio.</small></header>
           <div class="canal">
             <template x-for="c in ['whatsapp', 'telefono', 'instagram', 'mostrador']">
               <label class="radio"><input type="radio" name="canal" :value="c" x-model="canal"> <span x-text="ICONO_CANAL[c] + ' ' + c"></span></label>
@@ -181,6 +182,7 @@
     <!-- ---------- Embudo ---------- -->
     <section x-show="pestana === 'embudo'">
       <div class="filtros">
+        <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('embudo')" title="¿Cómo se usa?" aria-label="Ayuda">?</button>
         <label><input type="checkbox" role="switch" x-model="soloMias"> Solo las mías</label>
         <label><input type="checkbox" role="switch" x-model="soloRiesgo"> Solo las que se enfrían</label>
         <input type="search" x-model="buscar" placeholder="Buscar cliente o producto" aria-label="Buscar">
@@ -209,7 +211,7 @@
     <section x-show="pestana === 'tablero'">
       <article class="prioridades">
         <header>
-          <strong>🎯 ¿Por dónde empiezo hoy?</strong>
+          <strong>🎯 ¿Por dónde empiezo hoy? <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('tablero')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></strong>
           <button @click="pedirPrioridades" :aria-busy="pensando" :disabled="pensando">Preguntarle a la IA</button>
         </header>
         <template x-if="prioridades">
@@ -248,7 +250,7 @@
       <div class="dos">
         <article>
           <header>
-            <strong x-text="'🔔 Avisos de ' + nombreYo()"></strong>
+            <span><strong x-text="'🔔 Avisos de ' + nombreYo()"></strong> <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('avisos')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></span>
             <button class="outline mini-texto" @click="activarNotificaciones" x-show="permisoNotif !== 'granted'">Activar notificaciones</button>
             <small x-show="permisoNotif === 'granted'">✅ Notificaciones del navegador activas</small>
           </header>
@@ -264,7 +266,7 @@
           </ul>
         </article>
         <article class="rubro-config">
-          <header><strong x-text="negocio.emoji + ' Rubro y personalidad'"></strong> <small x-text="negocio.rubro"></small></header>
+          <header><span><strong x-text="negocio.emoji + ' Rubro y personalidad'"></strong> <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('rubro')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></span> <small x-text="negocio.rubro"></small></header>
           <div class="bot-tarjeta" :style="'--c:' + (config.color || '#0b6e4f')">
             <span class="bot-avatar" x-text="config.emoji"></span>
             <div><strong x-text="config.botNombre || 'Asistente'"></strong><small x-text="'Asistente de ' + config.nombre"></small></div>
@@ -300,7 +302,7 @@
           <small>La IA rehace el catálogo, el bot (nombre, jerga y vocabulario), el ícono, el color y los datos que hay que pedir. El equipo, WhatsApp y las reglas de avisos quedan.</small>
         </article>
         <article class="wa-config">
-          <header><strong>💬 Conexión de WhatsApp</strong></header>
+          <header><strong>💬 Conexión de WhatsApp <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('whatsapp')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></strong></header>
           <fieldset>
             <label><input type="radio" value="mock" x-model="config.whatsapp.modo"> <b>MOCK (demo)</b> — los mensajes llegan desde el <a href="whatsapp.html" target="_blank" rel="noopener">simulador de WhatsApp</a>, con el mismo formato que la API real.</label>
             <label><input type="radio" value="real" x-model="config.whatsapp.modo"> <b>API real</b> — WhatsApp Cloud API de Meta.</label>
@@ -316,7 +318,8 @@
           <button @click="guardarConfig" :aria-busy="guardando">Guardar conexión</button>
         </article>
         <article>
-          <header><strong>⚙️ Reglas de seguimiento</strong></header>
+          <header><strong>⚙️ Reglas de seguimiento <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('reglas')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></strong></header>
+          <label><input type="checkbox" role="switch" x-model="config.mostrarAyuda"> Mostrar los íconos de ayuda <span class="ayuda falsa">?</span> en cada sección</label>
           <label>Avisarle al responsable cada <input type="number" min="1" x-model.number="config.recordatorioMin" class="corto"> minutos mientras la venta no se mueva</label>
           <label>Si después de <input type="number" min="1" x-model.number="config.escalarTras" class="corto"> avisos nadie la mueve, avisarle también al administrador</label>
           <label>Una venta "se enfría" tras <input type="number" min="0.25" step="0.25" x-model.number="config.enfriaHoras" class="corto"> horas sin respuesta <small>(la IA lo sugirió para tu rubro)</small></label>
@@ -341,6 +344,7 @@
     <section x-show="pestana === 'negocio'">
       <div class="dos">
         <article class="qr-tarjeta" id="cartel">
+          <div class="no-imprimir" style="text-align:right"><button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('qr')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></div>
           <h3 x-text="negocio.emoji + ' ' + negocio.nombre"></h3>
           <p>Hacé tu pedido o consulta acá, te contestamos al toque 👇</p>
           <div id="qr" class="qr"></div>
@@ -358,7 +362,7 @@
           </div>
         </article>
         <article>
-          <header><strong>📦 Catálogo y precios</strong> <small>La IA usa estos precios; nunca los inventa.</small></header>
+          <header><strong>📦 Catálogo y precios <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('catalogo')" title="¿Cómo se usa?" aria-label="Ayuda">?</button></strong> <small>La IA usa estos precios; nunca los inventa.</small></header>
           <p class="ia" x-show="negocio.analisis">🧠 <span x-text="negocio.analisis"></span></p>
           <table class="catalogo">
             <thead><tr><th>Producto</th><th>Unidad</th><th class="der">Precio</th><th></th></tr></thead>
@@ -393,7 +397,7 @@
       <article class="detalle">
         <header>
           <button aria-label="Cerrar" rel="prev" @click="sel = null"></button>
-          <strong x-text="'#' + sel.id + ' · ' + (sel.cliente || 'Sin nombre')"></strong>
+          <strong x-text="'#' + sel.id + ' · ' + (sel.cliente || 'Sin nombre')"></strong> <button class="ayuda" x-show="negocio?.mostrarAyuda !== false" @click.stop="verAyuda('detalle')" title="¿Cómo se usa?" aria-label="Ayuda">?</button>
           <span class="etiqueta" :class="sel.tipo" x-text="TIPOS[sel.tipo]"></span>
           <span class="etiqueta rojo" x-show="sel.enRiesgo">🔥 se enfría</span>
         </header>
@@ -459,6 +463,22 @@
             <li><small x-text="fechaHora(ev.fecha)"></small> <span x-text="ev.texto"></span> <small x-show="ev.quien" x-text="'— ' + ev.quien"></small></li>
           </template>
         </ul>
+      </article>
+    </template>
+  </dialog>
+
+  <!-- ============ Ayuda de una sección ============ -->
+  <dialog :open="!!ayuda" @keydown.escape.window="ayuda = null" @click.self="ayuda = null">
+    <template x-if="ayuda">
+      <article class="ayuda-caja">
+        <header><button aria-label="Cerrar" rel="prev" @click="ayuda = null"></button><strong x-text="ayuda.titulo"></strong></header>
+        <p x-text="ayuda.texto"></p>
+        <ol><template x-for="paso in ayuda.pasos"><li x-text="paso"></li></template></ol>
+        <footer>
+          <a role="button" :href="'como-funciona.html#' + ayuda.video" target="_blank" rel="noopener">▶️ Ver el video</a>
+          <button class="secondary outline" @click="ayuda = null">Entendido</button>
+        </footer>
+        <small>Podés ocultar estos íconos en ⚙️ Configuración → Reglas de seguimiento.</small>
       </article>
     </template>
   </dialog>

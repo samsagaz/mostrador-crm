@@ -43,15 +43,29 @@ async function voz(texto) {
 const duracion = (f) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString())
 
 // ---------------------------------------------------------------- armado con ffmpeg
-function segmento(img, audio, salida) {
+// Un segmento: la captura, la voz y (si hay) el cursor que viaja de `desde` a `hasta` y hace clic.
+function segmento(img, audio, salida, cursor = null) {
   const pausa = 0.35
   const dur = audio ? duracion(audio) + pausa + 0.7 : 2.2
   const entrada = audio ? ['-i', audio] : ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo']
   const af = audio ? `adelay=${pausa * 1000}|${pausa * 1000},apad` : 'apad'
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-i', img, ...entrada, '-t', String(dur),
-    '-vf', `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:white,setsar=1,fps=30,format=yuv420p,` +
-      `fade=t=in:st=0:d=0.25,fade=t=out:st=${(dur - 0.25).toFixed(2)}:d=0.25`,
-    '-af', af, '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage', '-crf', '22',
+  const base = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:white,setsar=1,fps=30,format=yuv420p'
+  const fades = `fade=t=in:st=0:d=0.25,fade=t=out:st=${(dur - 0.25).toFixed(2)}:d=0.25`
+  let extra = [], filtro
+  if (cursor) {
+    // Movimiento suave (smoothstep) de 0.2 s a 1.2 s; el clic (círculo) aparece al llegar.
+    const [x0, y0] = cursor.desde, [x1, y1] = cursor.hasta
+    const P = 'clip((t-0.2)/1.0\\,0\\,1)'
+    const S = `(${P}*${P}*(3-2*${P}))`
+    extra = ['-loop', '1', '-i', `${TMP}/cursor.png`, '-loop', '1', '-i', `${TMP}/clic.png`]
+    filtro = `[0:v]${base}[b];` +
+      `[3:v]format=rgba,scale=iw*'min(1\\,0.4+(t-1.2)*2.2)':-1:eval=frame,fade=t=out:st=1.5:d=0.35:alpha=1[r];` +
+      `[b][r]overlay=x=${x1}-w/2:y=${y1}-h/2:enable='between(t\\,1.2\\,1.9)':eval=frame[b2];` +
+      `[2:v]format=rgba[c];[b2][c]overlay=x='${x0}+(${x1 - x0})*${S}':y='${y0}+(${y1 - y0})*${S}':eval=frame,${fades}[v]`
+  } else filtro = `[0:v]${base},${fades}[v]`
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-i', img, ...entrada, ...extra, '-t', String(dur),
+    '-filter_complex', filtro, '-map', '[v]', '-map', '1:a', '-af', af,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage', '-crf', '22',
     '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-b:a', '128k', salida])
 }
 function armar(id, partes) {
@@ -59,7 +73,7 @@ function armar(id, partes) {
   const lista = []
   partes.forEach((p, i) => {
     const seg = `${dir}/seg-${String(i).padStart(2, '0')}.mp4`
-    segmento(p.img, p.audio, seg)
+    segmento(p.img, p.audio, seg, p.cursor)
     lista.push(`file '${path.resolve(seg)}'`)
   })
   fs.writeFileSync(`${dir}/lista.txt`, lista.join('\n'))
@@ -272,6 +286,37 @@ const VIDEOS = [
   },
 ]
 
+// ---------------------------------------------------------------- a dónde apunta el cursor en cada paso
+const APUNTAR = {
+  'alta-y-rubro': ['.chip.activo', 'details textarea', '.kpi.riesgo', '.bot-tarjeta', '.rubro-config button.contrast', '.bot-tarjeta'],
+  whatsapp: ['.pie input[type=text]', '.msg.negocio@ultimo', '.msg.negocio@ultimo', '.msg.cliente@ultimo', '.etapas button.activa'],
+  'pasar-al-bot': ['button.bot', 'dialog .chat .burbuja.negocio@ultimo', '.msg.cliente@ultimo', '.linea-tiempo li'],
+  'leer-mensajes': ['.ficha table.items', '#muestra-captura img', '.ficha input', '.ficha .etiqueta'],
+  'avisos-y-seguimiento': ['.tarjeta.riesgo', '.wa-config + article input.corto', '.avisos li', 'dialog textarea', '.linea-tiempo li'],
+  tablero: ['.kpi.riesgo', '.prioridades ol li', '#gDias', '.graficos + .dos article'],
+  qr: ['#qr', '.resumen', '.columna.nuevo .tarjeta'],
+  'whatsapp-config': ['.wa-config fieldset label', '.wa-config input[type=password]'],
+}
+const posCursor = {}   // última posición del cursor en cada video
+
+// Resalta el elemento con un borde naranja y devuelve su centro en píxeles del video (1920×1080).
+async function marcar(p, selector) {
+  if (!selector) return null
+  const [sel, cual] = selector.split('@')
+  return p.evaluate((sel, cual) => {
+    const todos = [...document.querySelectorAll(sel)].filter((e) => e.getClientRects().length)
+    const el = cual === 'ultimo' ? todos.at(-1) : todos[0]
+    if (!el) return null
+    el.style.outline = '3px solid #ff6a00'
+    el.style.outlineOffset = '3px'
+    el.style.borderRadius ||= '6px'
+    const r = el.getBoundingClientRect()
+    const x = Math.min(Math.max(r.left + Math.min(r.width / 2, 160), 20), innerWidth - 20)
+    const y = Math.min(Math.max(r.top + Math.min(r.height / 2, 40), 20), innerHeight - 90)
+    return [Math.round(x * 1.5), Math.round(y * 1.5)]
+  }, sel, cual)
+}
+
 // ---------------------------------------------------------------- capturas
 const capturas = {}   // id → [archivo por paso]
 const guardar = (id, i, archivo) => { (capturas[id] ??= [])[i] = archivo }
@@ -283,8 +328,17 @@ async function paso(p, id, i, { avisos = false } = {}) {
   await verError(p)
   if (!avisos) await p.evaluate(() => { try { Alpine.$data(document.querySelector('[x-data]')).toasts = [] } catch {} })
   await rotulo(p, i + 1, total(id), v.pasos[i].rotulo)
+  const hasta = await marcar(p, APUNTAR[id]?.[i])
   guardar(id, i, await foto(p, `${dir(id)}/paso-${i}.png`))
+  if (hasta) {
+    cursores[id] ??= []
+    cursores[id][i] = { desde: posCursor[id] || [960, 980], hasta }
+    posCursor[id] = hasta
+  }
+  // Saca el resaltado para la próxima captura.
+  await p.evaluate(() => document.querySelectorAll('[style*="outline"]').forEach((e) => { e.style.outline = ''; e.style.outlineOffset = '' }))
 }
+const cursores = {}
 // El detalle de una venta es un <dialog> con su propio scroll: para ver el historial hay que bajarlo.
 const alFinalDelDetalle = (p) => p.evaluate(() => document.querySelectorAll('dialog, dialog article').forEach((d) => { d.scrollTop = d.scrollHeight }))
 const tel = (n) => n
@@ -419,6 +473,17 @@ await subir(P, 0)
 await alElemento(P, '.rubro-config', 120)
 await paso(P, 'alta-y-rubro', 5)
 
+// El cursor y el círculo del clic, como PNG transparentes.
+const C = await navegador.newPage()
+await C.setViewport({ width: 60, height: 60, deviceScaleFactor: 1.5 })
+await C.setContent(`<body style="margin:0;background:transparent"><svg width="40" height="48" viewBox="0 0 20 24" style="filter:drop-shadow(1px 2px 2px #0007)">
+  <path d="M1 1 L1 19 L6 14.5 L9.5 22 L12.5 20.7 L9 13.5 L15.5 13.5 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></body>`)
+await C.screenshot({ path: `${TMP}/cursor.png`, omitBackground: true, clip: { x: 0, y: 0, width: 32, height: 40 } })
+await C.setViewport({ width: 90, height: 90, deviceScaleFactor: 1.5 })
+await C.setContent(`<body style="margin:0;background:transparent"><div style="width:80px;height:80px;margin:5px;border-radius:50%;border:5px solid #ff6a00;background:rgba(255,106,0,.25);box-sizing:border-box"></div></body>`)
+await C.screenshot({ path: `${TMP}/clic.png`, omitBackground: true })
+await C.close()
+
 // Placas (títulos y video general)
 const PL = await pagina('/placas.html')
 async function placa(url, archivo) {
@@ -438,7 +503,7 @@ const resumen = []
 for (const v of VIDEOS) {
   if (!quiero(v.id)) continue
   const partes = [{ img: 'public/img/donweb.jpg' }, { img: v.portada, audio: await voz(v.voz) }]
-  for (const [i, s] of v.pasos.entries()) partes.push({ img: capturas[v.id][i], audio: await voz(s.voz) })
+  for (const [i, s] of v.pasos.entries()) partes.push({ img: capturas[v.id][i], audio: await voz(s.voz), cursor: cursores[v.id]?.[i] })
   partes.push({ img: 'public/img/donweb.jpg' })
   armar(v.id, partes)
   resumen.push({ id: v.id, n: v.n, titulo: v.titulo, sub: v.sub, icono: v.icono, pasos: v.pasos.map((s) => s.rotulo) })
