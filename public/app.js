@@ -115,14 +115,22 @@ function oscurecer(hex, k = 0.55) {
   const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k))
   return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
 }
+// Mezcla un color con blanco (k = 0 queda igual, 1 = blanco).
+function aclarar(hex, k) {
+  const n = parseInt(hex.slice(1), 16)
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * k))
+  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
+}
 function aplicarTema(negocio) {
   const raiz = document.documentElement.style
   const color = /^#[0-9a-f]{6}$/i.test(negocio?.color || '') ? negocio.color : '#0b6e4f'
-  for (const v of ['--pico-primary', '--pico-primary-background', '--pico-primary-border']) raiz.setProperty(v, color)
-  for (const v of ['--pico-primary-hover', '--pico-primary-hover-background', '--pico-primary-hover-border']) raiz.setProperty(v, oscurecer(color, 0.8))
+  // Variables del rubro; estilo.css arma con ellas los colores de Pico para claro y para oscuro.
+  raiz.setProperty('--rubro', color)
+  raiz.setProperty('--rubro-hover', oscurecer(color, 0.8))
+  raiz.setProperty('--rubro-claro', aclarar(color, 0.55))    // textos y bordes en oscuro
+  raiz.setProperty('--rubro-medio', aclarar(color, 0.22))    // fondo de botones en oscuro
   raiz.setProperty('--color-rubro', color)
   raiz.setProperty('--color-rubro-oscuro', oscurecer(color))
-  raiz.setProperty('--pico-primary-focus', color + '40')
   const emoji = negocio?.emoji || '🛎️'
   let icono = document.querySelector('link[rel=icon]')
   icono.href = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${encodeURIComponent(emoji)}</text></svg>`

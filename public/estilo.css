@@ -1,7 +1,5 @@
 :root {
-  --pico-primary: #0b6e4f; --pico-primary-background: #0b6e4f; --pico-primary-border: #0b6e4f;
-  --pico-primary-hover: #095c42; --pico-primary-hover-background: #095c42; --pico-primary-hover-border: #095c42;
-  --pico-primary-focus: rgba(11, 110, 79, .25); --pico-primary-underline: rgba(11, 110, 79, .5);
+  --rubro: #0b6e4f; --rubro-hover: #095c42; --rubro-claro: #86c9b0; --rubro-medio: #3a8a6e;
   --rojo: #c62828; --verde: #2e7d32; --naranja: #ef6c00; --fondo-suave: #f4f7f6;
   --pico-font-size: 100%;
 }
@@ -26,7 +24,7 @@ body { background: var(--fondo-suave); }
 .alta h1 { font-size: 1.9rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: -.4rem 0 1rem; }
 .chip { padding: .3rem .8rem; font-size: .9rem; border-radius: 2rem; background: #fff; color: #263238; border: 1px solid var(--pico-muted-border-color); width: auto; margin: 0; }
-.chip.activo { background: var(--pico-primary); color: #fff; }
+.chip.activo { background: var(--pico-primary-background); color: #fff; }
 
 /* KPIs */
 .app { padding: 1rem; max-width: 1500px; margin: 0 auto; }
@@ -208,3 +206,29 @@ input[type=color] { height: 2.8rem; padding: .2rem; }
 .tema { padding: .35rem .6rem !important; }
 [data-theme=dark] .pestanas button.activa { color: #fff; }
 [data-theme=dark] a:not([role=button]) { color: #8cc8ff; }
+
+/* Colores de Pico a partir del color del rubro (más claros en modo oscuro para que se lean). */
+:root[data-theme=light], :root:not([data-theme]) {
+  --pico-primary: var(--rubro); --pico-primary-background: var(--rubro); --pico-primary-border: var(--rubro);
+  --pico-primary-hover: var(--rubro-hover); --pico-primary-hover-background: var(--rubro-hover); --pico-primary-hover-border: var(--rubro-hover);
+  --pico-primary-underline: var(--rubro); --pico-primary-focus: color-mix(in srgb, var(--rubro) 30%, transparent);
+}
+:root[data-theme=dark] {
+  --pico-primary: var(--rubro-claro); --pico-primary-background: var(--rubro-medio); --pico-primary-border: var(--rubro-medio);
+  --pico-primary-hover: #fff; --pico-primary-hover-background: var(--rubro); --pico-primary-hover-border: var(--rubro-claro);
+  --pico-primary-underline: var(--rubro-claro); --pico-primary-focus: color-mix(in srgb, var(--rubro-claro) 35%, transparent);
+  --pico-primary-inverse: #fff;
+  --pico-secondary: #b8c4cf; --pico-secondary-border: #4b5866; --pico-secondary-background: #3a4652; --pico-secondary-inverse: #fff;
+  --pico-contrast: #e6edf3; --pico-contrast-background: #e6edf3; --pico-contrast-border: #e6edf3; --pico-contrast-inverse: #11161a;
+}
+[data-theme=dark] .archivo { color: var(--rubro-claro); border-color: var(--rubro-claro); }
+[data-theme=dark] .archivo.insta { color: #fff; }
+[data-theme=dark] .etapas button.outline { color: #e6edf3; border-color: #4b5866; }
+[data-theme=dark] .etapas button.activa { background: var(--rubro-medio); border-color: var(--rubro-claro); color: #fff; }
+[data-theme=dark] button.outline.secondary, [data-theme=dark] [role=button].outline.secondary { color: #d0d8e0; border-color: #4b5866; }
+[data-theme=dark] input[type=color] { background: #1a2127; }
+[data-theme=dark] .ayuda { background: var(--rubro-medio); color: #fff; }
+[data-theme=dark] .kpi small, [data-theme=dark] .kpi span { color: #9aa7b3; }
+[data-theme=dark] .kpi.riesgo small, [data-theme=dark] .kpi.riesgo span { color: #ffe0e0; }
+[data-theme=dark] .tarjeta small, [data-theme=dark] .meta { color: #9aa7b3; }
+[data-theme=dark] .aviso-cat, [data-theme=dark] .sugerido { color: #ffb066; }
