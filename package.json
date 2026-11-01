@@ -19,5 +19,8 @@
     "better-sqlite3": "^13.0.3",
     "hono": "^4.13.16",
     "openai": "^7.47.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.43.1"
   }
 }

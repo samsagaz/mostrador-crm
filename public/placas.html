@@ -46,7 +46,11 @@
   <script>
     // placas.html?p=p-flujo muestra solo esa placa, a pantalla completa (para capturarla).
     addEventListener('DOMContentLoaded', () => {
-      const id = new URLSearchParams(location.search).get('p')
+      const q = new URLSearchParams(location.search)
+      if (q.get('titulo')) {
+        for (const k of ['titulo', 'sub', 'n', 'icono']) if (q.get(k)) document.getElementById('t-' + k).textContent = q.get(k)
+      }
+      const id = q.get('p')
       if (!id) return
       document.body.classList.add('una')
       document.getElementById(id)?.classList.add('ver')
@@ -100,6 +104,14 @@
     <div><b>⬆️ Escala:</b> si sigue quieta, le avisa también al administrador.</div>
     <div><b>🚑 Rescate:</b> la IA escribe el mensaje para recuperar la venta.</div>
   </div>
+  <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
+</section>
+
+<section class="placa portada" id="p-titulo">
+  <div class="icono" id="t-icono">🛎️</div>
+  <p class="sub" id="t-n" style="margin:0 0 10px;font-weight:600"></p>
+  <h1 id="t-titulo"></h1>
+  <p class="sub" id="t-sub"></p>
   <img class="marca" src="img/donweb-marca.jpg" alt="DonWeb">
 </section>
 

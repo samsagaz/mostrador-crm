@@ -21,7 +21,7 @@ const openai = new OpenAI({ maxRetries: 2, timeout: 60_000 })
 // ---------------------------------------------------------------------------
 // Base de datos: el JSON entero en `datos`, y aparte lo que se usa para filtrar.
 // ---------------------------------------------------------------------------
-const db = new Database('data.db')
+const db = new Database(process.env.DB_FILE || 'data.db')
 db.pragma('journal_mode = WAL')
 db.exec(`
   CREATE TABLE IF NOT EXISTS negocio (id INTEGER PRIMARY KEY CHECK (id = 1), datos TEXT NOT NULL);
