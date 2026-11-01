@@ -18,6 +18,14 @@
     .tec article { margin: 0; }
     .tec b { display: block; }
     ol.flujo li { margin-bottom: .6rem; }
+    .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .galeria a { display: block; background: #fff; border-radius: 12px; overflow: hidden; text-decoration: none; color: inherit; box-shadow: 0 2px 10px #0001; transition: transform .15s; }
+    .galeria a:hover { transform: translateY(-3px); }
+    .galeria a.activo { outline: 3px solid #ff6a00; }
+    .galeria img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+    .galeria div { padding: .7rem .9rem; }
+    .galeria small { color: #ff6a00; font-weight: 600; display: block; }
+    .galeria ul { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .8rem; color: #555; }
   </style>
 </head>
 <body>
@@ -27,8 +35,13 @@
     <img src="img/donweb-marca.jpg" alt="DonWeb">
   </header>
   <main>
-    <video controls preload="metadata" poster="video/poster.jpg" src="video/tutorial.mp4"></video>
-    <p><small>¿No se ve? <a href="video/tutorial.mp4" download>Descargá el video</a> · <a href="/">Abrir Mostrador</a> · <a href="whatsapp.html">Simulador de WhatsApp</a></small></p>
+    <!-- El video que se está viendo, y abajo la lista de todos (sale de video/videos.json, que arma scripts/videos.mjs). -->
+    <video id="reproductor" controls preload="metadata" poster="video/general.jpg" src="video/general.mp4"></video>
+    <h3 id="titulo-actual">Mostrador en 1 minuto</h3>
+    <p><small><a id="descargar" href="video/general.mp4" download>Descargar este video</a> · <a href="/">Abrir Mostrador</a> · <a href="whatsapp.html">Simulador de WhatsApp</a></small></p>
+
+    <h2>Todos los videos, paso a paso</h2>
+    <div class="galeria" id="galeria"></div>
 
     <h2>El flujo completo</h2>
     <ol class="flujo">
@@ -52,5 +65,33 @@
       <article><b>☁️ DonWeb Cloud Server</b><small>Publicado con HTTPS (Caddy) y siempre encendido (pm2).</small></article>
     </div>
   </main>
+<script>
+  // Arma la galería con video/videos.json y cambia el video de arriba al tocar uno.
+  fetch('video/videos.json').then((r) => r.json()).then((videos) => {
+    const g = document.getElementById('galeria')
+    for (const v of videos) {
+      const a = document.createElement('a')
+      a.href = '#' + v.id
+      a.innerHTML = '<img loading="lazy" alt=""><div><small></small><strong></strong><ul></ul></div>'
+      a.querySelector('img').src = `video/${v.id}.jpg`
+      a.querySelector('small').textContent = v.n
+      a.querySelector('strong').textContent = `${v.icono} ${v.titulo}`
+      for (const p of v.pasos) { const li = document.createElement('li'); li.textContent = p; a.querySelector('ul').appendChild(li) }
+      a.onclick = (e) => { e.preventDefault(); ver(v, a) }
+      g.appendChild(a)
+      if (location.hash === '#' + v.id) ver(v, a)
+    }
+    if (!location.hash) g.firstChild?.classList.add('activo')
+  }).catch(() => {})
+  function ver(v, a) {
+    const r = document.getElementById('reproductor')
+    r.src = `video/${v.id}.mp4`; r.poster = `video/${v.id}.jpg`
+    document.getElementById('titulo-actual').textContent = `${v.n}: ${v.titulo}`
+    document.getElementById('descargar').href = `video/${v.id}.mp4`
+    document.querySelectorAll('.galeria a').forEach((x) => x.classList.toggle('activo', x === a))
+    history.replaceState(null, '', '#' + v.id)
+    r.scrollIntoView({ behavior: 'smooth' }); r.play().catch(() => {})
+  }
+</script>
 </body>
 </html>

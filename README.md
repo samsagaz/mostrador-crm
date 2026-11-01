@@ -3,7 +3,7 @@
 **Hackatón DonWeb Day Rosario, 1/11/2026.** Desafío: un negocio local pierde ventas porque atiende consultas y
 pedidos a mano, por WhatsApp o por teléfono.
 
-**Demo:** `https://[URL]` · **Simulador de WhatsApp:** `https://[URL]/whatsapp.html` · **Pedidos por QR:** `https://[URL]/pedir.html`
+**Demo:** `https://[URL]` · **Simulador de WhatsApp:** `https://[URL]/whatsapp.html` · **Pedidos por QR:** `https://[URL]/pedir.html` · **🎬 Videos paso a paso:** `https://[URL]/como-funciona.html`
 
 ## El problema, de raíz
 
@@ -51,6 +51,14 @@ En **⚙️ Configuración → Conexión de WhatsApp**:
 - **API real (WhatsApp Cloud API):** cargá el token, el Phone Number ID y, opcional, el App Secret (con él se valida la
   firma `X-Hub-Signature-256`). En Meta for Developers, la URL de callback es `https://[URL]/webhook/whatsapp`, con el
   verify token que muestra la pantalla, suscripto a `messages`. Los mensajes repetidos (mismo `wamid`) se atienden una sola vez.
+
+## Videos tutoriales
+
+En `/como-funciona.html` hay 9 videos con voz en off (voz masculina, español rioplatense) y el logo de DonWeb:
+uno general y uno por flujo (alta y rubro, WhatsApp, pasarle al bot, leer mensajes y capturas, avisos y seguimiento,
+tablero, QR y modo MOCK/API real). Se generan solos con `node scripts/videos.mjs`: levanta la app con una base aparte,
+la maneja con Chrome (puppeteer-core), saca las capturas con un rótulo por paso, genera la voz con `gpt-4o-mini-tts`
+y arma cada video con ffmpeg.
 
 ## Stack
 

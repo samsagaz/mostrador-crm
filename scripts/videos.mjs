@@ -103,6 +103,12 @@ async function rotulo(p, n, total, texto) {
     Object.assign(r.querySelector('.rt').style, { flex: '1', lineHeight: '1.25' })
     Object.assign(r.querySelector('img').style, { height: '38px', borderRadius: '6px', flex: 'none' })
     document.body.appendChild(r)
+    if (!document.getElementById('rotulo-estilo')) {
+      const st = document.createElement('style')
+      st.id = 'rotulo-estilo'
+      st.textContent = '.toasts { bottom: 90px !important; } .error-flotante { display: none !important; }'
+      document.head.appendChild(st)
+    }
   }, n, total, texto)
 }
 async function foto(p, archivo) {
@@ -272,12 +278,15 @@ const guardar = (id, i, archivo) => { (capturas[id] ??= [])[i] = archivo }
 const dir = (id) => { fs.mkdirSync(`${TMP}/${id}`, { recursive: true }); return `${TMP}/${id}` }
 const quiero = (id) => !SOLO.length || SOLO.includes(id)
 const total = (id) => VIDEOS.find((v) => v.id === id).pasos.length
-async function paso(p, id, i) {
+async function paso(p, id, i, { avisos = false } = {}) {
   const v = VIDEOS.find((x) => x.id === id)
+  await verError(p)
+  if (!avisos) await p.evaluate(() => { try { Alpine.$data(document.querySelector('[x-data]')).toasts = [] } catch {} })
   await rotulo(p, i + 1, total(id), v.pasos[i].rotulo)
   guardar(id, i, await foto(p, `${dir(id)}/paso-${i}.png`))
-  await verError(p)
 }
+// El detalle de una venta es un <dialog> con su propio scroll: para ver el historial hay que bajarlo.
+const alFinalDelDetalle = (p) => p.evaluate(() => document.querySelectorAll('dialog, dialog article').forEach((d) => { d.scrollTop = d.scrollHeight }))
 const tel = (n) => n
 
 console.log('Capturando…')
@@ -294,7 +303,7 @@ await P.evaluate(() => document.querySelectorAll('.toast').forEach((t) => t.remo
 await alp(P, `a.toasts = []`)
 await subir(P, 0)
 await paso(P, 'alta-y-rubro', 2)
-await alp(P, `a.irA('equipo')`)
+await alp(P, `a.irA('equipo'); a.config.color = '#c2410c'; await a.guardarConfig()`)
 await alElemento(P, '.rubro-config')
 await paso(P, 'alta-y-rubro', 3)
 
@@ -323,7 +332,7 @@ await wa(`a.salir(); a.nombre = 'Raúl'; a.telefono = '5493416550099'; a.entrar(
 await wa(`a.texto = 'Sí, confirmo. Paso a la tarde'; await a.enviarTexto()`)
 await paso(W, 'pasar-al-bot', 2)
 await alp(P, `await a.refrescar(); const o = a.ops.find((x) => x.telefono === '3416550099' || x.telefono === '5493416550099'); if (o) a.abrir(o)`)
-await P.evaluate(() => { const d = document.querySelector('dialog'); if (d) d.scrollTop = d.scrollHeight })
+await alFinalDelDetalle(P)
 await paso(P, 'pasar-al-bot', 3)
 await alp(P, `a.sel = null`)
 
@@ -357,11 +366,11 @@ await paso(P, 'avisos-y-seguimiento', 1)
 await alp(P, `await a.revisarAvisos(true); a.irA('equipo'); a.toasts = []; if (a.avisos[0]) a.toast('⏰ ' + a.avisos[0].texto, 'alerta')`)
 await subir(P, 0)
 await alElemento(P, '.pestanas', 110)
-await paso(P, 'avisos-y-seguimiento', 2)
+await paso(P, 'avisos-y-seguimiento', 2, { avisos: true })
 await alp(P, `a.toasts = []; const o = a.ops.find((x) => x.enRiesgo && x.telefono) || a.ops.find((x) => x.enRiesgo); a.abrir(o); await a.redactar(o, 'rescate')`)
 await paso(P, 'avisos-y-seguimiento', 3)
 await alp(P, `a.nota = 'Lo llamé y no atendió, le mando el WhatsApp'; await a.agregarNota(a.sel); await a.posponer(a.sel, 60); a.toasts = []`)
-await P.evaluate(() => { const d = document.querySelector('dialog'); if (d) d.scrollTop = d.scrollHeight })
+await alFinalDelDetalle(P)
 await paso(P, 'avisos-y-seguimiento', 4)
 await alp(P, `a.sel = null; a.borrador = null`)
 
@@ -405,7 +414,8 @@ await alp(P, `a.config.whatsapp.modo = 'mock'`)
 await alp(P, `a.irA('equipo'); a.nuevoRubro = { rubro: 'Veterinaria y pet shop', nombre: 'Veterinaria Patitas', ciudad: '', listaPrecios: '', borrarVentas: true }`)
 await alElemento(P, '.rubro-config h6', 200)
 await paso(P, 'alta-y-rubro', 4)
-await alp(P, `await a.cambiarRubroIA(); a.toasts = []`)
+await alp(P, `await a.cambiarRubroIA()`)
+await subir(P, 0)
 await alElemento(P, '.rubro-config', 120)
 await paso(P, 'alta-y-rubro', 5)
 

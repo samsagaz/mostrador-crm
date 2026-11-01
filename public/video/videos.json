@@ -1,0 +1,120 @@
+[
+  {
+    "id": "general",
+    "n": "Mostrador en 1 minuto",
+    "titulo": "El CRM que no deja escapar ventas",
+    "sub": "Qué es, con qué está hecho y cómo fluye una venta",
+    "icono": "🛎️",
+    "pasos": [
+      "Dónde se pierden las ventas",
+      "Las tecnologías, en pocas palabras",
+      "El flujo completo de una venta",
+      "Ninguna venta sin respuesta"
+    ]
+  },
+  {
+    "id": "alta-y-rubro",
+    "n": "Paso a paso · 1",
+    "titulo": "Armá tu CRM en un minuto",
+    "sub": "Elegís el rubro y la IA adapta todo: catálogo, bot, ícono y color",
+    "icono": "🧠",
+    "pasos": [
+      "Elegís el rubro, el nombre del negocio y tu equipo",
+      "Pegás tu lista de precios (o le sacás una foto)",
+      "Listo: catálogo, ventas y tablero con la plata en juego",
+      "Tu asistente tiene nombre, ícono, color y la jerga del rubro",
+      "¿Otro rubro? La IA adapta todo sin perder tu equipo ni tu WhatsApp",
+      "Ahora el bot habla como una veterinaria"
+    ]
+  },
+  {
+    "id": "whatsapp",
+    "n": "Paso a paso · 2",
+    "titulo": "Te escriben por WhatsApp",
+    "sub": "El bot responde con tus precios y confirma el pedido",
+    "icono": "💬",
+    "pasos": [
+      "El cliente escribe por WhatsApp (en la demo, con el simulador)",
+      "El bot responde al instante, con el precio real de tu catálogo",
+      "Resume el pedido con el total y le pide que confirme",
+      "El cliente dice que sí",
+      "En el CRM pasó sola a \"Confirmado · preparar\", con su historial"
+    ]
+  },
+  {
+    "id": "pasar-al-bot",
+    "n": "Paso a paso · 3",
+    "titulo": "Te llamaron: pasáselo al bot",
+    "sub": "Anotás dos palabras y el bot sigue por WhatsApp",
+    "icono": "🤖",
+    "pasos": [
+      "Anotás en dos palabras lo que pidió y su celular",
+      "El bot arma la venta y le escribe por WhatsApp con el total",
+      "El cliente lo recibe en su WhatsApp y confirma",
+      "Confirmada, con todo el caso en el historial"
+    ]
+  },
+  {
+    "id": "leer-mensajes",
+    "n": "Paso a paso · 4",
+    "titulo": "Leé cualquier mensaje",
+    "sub": "Texto, captura de Instagram, foto de una lista o audio",
+    "icono": "📥",
+    "pasos": [
+      "Pegás el mensaje y la IA arma la ficha con tus precios",
+      "También lee capturas de Instagram (subís o pegás la imagen)",
+      "Separa lo que dijo el cliente, toma su usuario y arma el pedido",
+      "Si no tiene nada que ver con el negocio, no inventa"
+    ]
+  },
+  {
+    "id": "avisos-y-seguimiento",
+    "n": "Paso a paso · 5",
+    "titulo": "Ninguna venta se olvida",
+    "sub": "Responsables, avisos, escalamiento, rescate e historial",
+    "icono": "🔔",
+    "pasos": [
+      "El embudo: las ventas que se enfrían se ponen en rojo",
+      "Configurás cada cuánto avisar, cuándo escalar y quién es tu equipo",
+      "El responsable recibe avisos con sonido hasta que la atienda",
+      "Rescatar venta: la IA escribe el mensaje de seguimiento",
+      "Notas, recordatorios y el historial completo del cliente"
+    ]
+  },
+  {
+    "id": "tablero",
+    "n": "Paso a paso · 6",
+    "titulo": "Tus ventas, en plata",
+    "sub": "El tablero y las prioridades del día",
+    "icono": "📊",
+    "pasos": [
+      "Plata enfriándose, en juego, ganada y tiempo de respuesta",
+      "¿Por dónde empiezo hoy? La IA prioriza las 3 ventas clave",
+      "Qué entra, qué se cierra, por dónde llegan y qué se vende",
+      "Lo que te piden y no tenés, y por qué se pierden las ventas"
+    ]
+  },
+  {
+    "id": "qr",
+    "n": "Paso a paso · 7",
+    "titulo": "Tu QR de pedidos",
+    "sub": "Pedidos las 24 horas, directo al embudo",
+    "icono": "📱",
+    "pasos": [
+      "Imprimís el cartel con tu QR o compartís el link",
+      "El cliente escanea y el asistente lo atiende con tus precios",
+      "Cada pedido del QR cae solo en el embudo"
+    ]
+  },
+  {
+    "id": "whatsapp-config",
+    "n": "Paso a paso · 8",
+    "titulo": "WhatsApp: demo o API real",
+    "sub": "Se elige desde Configuración",
+    "icono": "⚙️",
+    "pasos": [
+      "Modo MOCK: la demo funciona con el simulador de WhatsApp",
+      "API real: token y número de WhatsApp Business de Meta"
+    ]
+  }
+]

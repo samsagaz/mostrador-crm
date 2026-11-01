@@ -399,7 +399,7 @@
         </header>
         <div class="etapas">
           <template x-for="e in ETAPAS" :key="e.id">
-            <button :class="{ activa: sel.etapa === e.id, outline: sel.etapa !== e.id }" @click="moverA(sel, e.id)" x-text="e.icono + ' ' + e.nombre"></button>
+            <button :class="{ activa: sel?.etapa === e.id, outline: sel?.etapa !== e.id }" @click="moverA(sel, e.id)" x-text="e.icono + ' ' + e.nombre"></button>
           </template>
         </div>
         <div class="grid">
@@ -413,7 +413,7 @@
             <div class="falta" x-show="sel.faltaInfo?.length"><strong>❓ Falta</strong><ul><template x-for="p in sel.faltaInfo"><li x-text="p"></li></template></ul></div>
             <label>Responsable
               <select @change="asignar(sel, Number($event.target.value))">
-                <template x-for="u in negocio.usuarios" :key="u.id"><option :value="u.id" :selected="u.id === sel.asignado" x-text="u.nombre"></option></template>
+                <template x-for="u in negocio.usuarios" :key="u.id"><option :value="u.id" :selected="u.id === sel?.asignado" x-text="u.nombre"></option></template>
               </select>
             </label>
             <div class="posponer">

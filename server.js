@@ -124,7 +124,8 @@ const PROMPT_RUBRO = `Sos consultor de ventas de comercios de barrio en Argentin
 - enfriaHoras: cuántas horas puede esperar un cliente de este rubro sin respuesta antes de comprarle a otro (comida: 0.5 a 1; almacén: 2; ferretería o corralón: 6 a 24; servicios grandes: 24 a 48).
 - palabraVenta: cómo le dice este rubro a una venta, en singular y minúscula ("pedido", "turno", "presupuesto", "encargo", "reserva"). palabraCliente: cómo le dice al cliente ("cliente", "paciente", "comensal", "vecino").
 - saludo: la primera frase que ve el cliente en la página de pedidos, cálida y corta, con el nombre del negocio y del asistente.
-- Si el rubro no es un negocio real o no se entiende, explicalo en analisis y dejá catalogo vacío.`
+- El catálogo NUNCA va vacío para un negocio real: sin lista de precios, proponé igual los 12 a 16 productos o servicios típicos con precio null.
+- Solo si el rubro no es un negocio (un insulto, algo sin sentido), explicalo en analisis y dejá catalogo vacío.`
 
 const DatosRubro = type({
   nombre: '0 < string <= 80',
@@ -140,7 +141,15 @@ const emojiValido = (e, def) => {
   const x = [...String(e || '')].slice(0, 2).join('').trim()
   return x && /\p{Extended_Pictographic}/u.test(x) ? x : def
 }
-const colorValido = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || '').trim()) ? String(c).trim() : '#0b6e4f')
+// El color del rubro tiene que leerse con texto blanco encima: si es claro, se oscurece.
+function colorValido(c) {
+  const hex = String(c || '').trim()
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return '#0b6e4f'
+  let [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const luz = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  if (luz > 0.45) { const k = 0.45 / luz; [r, g, b] = [r, g, b].map((v) => Math.round(v * k)) }
+  return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
+}
 
 // La IA arma todo lo que depende del rubro: catálogo, personalidad del bot, ícono, color, vocabulario.
 async function armarRubro(body) {
@@ -149,7 +158,11 @@ async function armarRubro(body) {
   const contenido = body.imagen
     ? [{ type: 'text', text: pedido + '\n\nTe paso la foto de su lista de precios.' }, { type: 'image_url', image_url: { url: body.imagen } }]
     : pedido
-  const r = await pedirJSON(formatoRubro, [{ role: 'system', content: PROMPT_RUBRO }, { role: 'user', content: contenido }])
+  let r = await pedirJSON(formatoRubro, [{ role: 'system', content: PROMPT_RUBRO }, { role: 'user', content: contenido }])
+  // Si vino sin catálogo, un segundo intento más explícito (el modelo chico a veces se confunde sin lista de precios).
+  if (!r.catalogo.length) r = await pedirJSON(formatoRubro, [{ role: 'system', content: PROMPT_RUBRO },
+    { role: 'user', content: contenido }, { role: 'assistant', content: JSON.stringify(r) },
+    { role: 'user', content: 'El catálogo vino vacío. Es un negocio real: proponé de 12 a 16 productos o servicios típicos de este rubro con precio null.' }])
   if (!r.catalogo.length) return { error: `La IA no pudo armar el negocio: ${r.analisis}` }
   const emoji = emojiValido(r.emoji, '🏪')
   return {
