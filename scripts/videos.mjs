@@ -32,21 +32,26 @@ const VOZ = {
   instructions: 'Voz masculina adulta. Español de Argentina, acento rioplatense con voseo ("tenés", "elegís", "mirá"). ' +
     'Tono cálido, seguro y claro, como un tutorial para dueños de comercios. Ritmo natural, ni apurado ni lento.',
 }
+// Velocidad de la voz (1.3 = 30 % más rápido). Se acelera con ffmpeg (atempo), que no cambia el tono.
+const VELOCIDAD = Number(process.env.VELOCIDAD_VOZ) || 1.3
 async function voz(texto) {
   const archivo = `${TMP}/tts/${createHash('sha256').update(JSON.stringify([VOZ, texto])).digest('hex').slice(0, 16)}.mp3`
   if (!fs.existsSync(archivo)) {
     const r = await openai.audio.speech.create({ ...VOZ, input: texto, response_format: 'mp3' })
     fs.writeFileSync(archivo, Buffer.from(await r.arrayBuffer()))
   }
-  return archivo
+  if (VELOCIDAD === 1) return archivo
+  const rapido = archivo.replace('.mp3', `-x${VELOCIDAD}.mp3`)
+  if (!fs.existsSync(rapido)) execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', archivo, '-filter:a', `atempo=${VELOCIDAD}`, '-q:a', '3', rapido])
+  return rapido
 }
 const duracion = (f) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString())
 
 // ---------------------------------------------------------------- armado con ffmpeg
 // Un segmento: la captura, la voz y (si hay) el cursor que viaja de `desde` a `hasta` y hace clic.
 function segmento(img, audio, salida, cursor = null) {
-  const pausa = 0.35
-  const dur = audio ? duracion(audio) + pausa + 0.7 : 2.2
+  const pausa = 0.25
+  const dur = audio ? Math.max(duracion(audio) + pausa + 0.5, 2.2) : 1.8
   const entrada = audio ? ['-i', audio] : ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo']
   const af = audio ? `adelay=${pausa * 1000}|${pausa * 1000},apad` : 'apad'
   const base = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:white,setsar=1,fps=30,format=yuv420p'
