@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hacé tu pedido</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛍️</text></svg>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+  <style>
+    :root { --pico-primary: #0b6e4f; --pico-primary-background: #0b6e4f; --pico-primary-border: #0b6e4f; --pico-primary-hover-background: #095c42; }
+    [x-cloak] { display: none !important; }
+    body { background: #f4f7f6; }
+    main { max-width: 640px; margin: 0 auto; padding: 1rem; }
+    .cabecera { text-align: center; margin-bottom: 1rem; }
+    .cabecera .emoji { font-size: 3rem; }
+    .chat { background: #efeae2; border-radius: 14px; padding: .8rem; min-height: 280px; max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
+    .b { max-width: 85%; padding: .5rem .7rem; border-radius: 10px; white-space: pre-wrap; font-size: .95rem; }
+    .b.negocio { background: #fff; align-self: flex-start; }
+    .b.cliente { background: #d9fdd3; align-self: flex-end; }
+    .b.pensando { color: #667781; font-style: italic; }
+    form { display: flex; gap: .4rem; margin-top: .6rem; align-items: center; }
+    form input[type=text] { margin: 0; flex: 1; }
+    form button, .icono { width: auto; margin: 0; padding: .6rem .8rem; }
+    .icono { border: 1px solid var(--pico-primary); border-radius: var(--pico-border-radius); cursor: pointer; }
+    .icono input { display: none; }
+    .rec { background: #c62828 !important; border-color: #c62828 !important; }
+    .resumen { margin-top: 1rem; }
+    .resumen li { display: flex; justify-content: space-between; list-style: none; }
+    .error { background: #c62828; color: #fff; padding: .6rem; border-radius: 8px; cursor: pointer; }
+  </style>
+  <script>
+    async function revisar(r) {
+      if (r.ok) return r
+      const { error } = await r.json().catch(() => ({}))
+      throw new Error(error || `El servidor respondió ${r.status}.`)
+    }
+    const leerLocal = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d } catch { return d } }
+    const guardarLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
+    async function achicar(archivo) {
+      const img = await createImageBitmap(archivo)
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height))
+      const cv = Object.assign(document.createElement('canvas'), { width: img.width * k, height: img.height * k })
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
+      return cv.toDataURL('image/jpeg', 0.85)
+    }
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('pedir', () => ({
+        negocio: null, mensajes: leerLocal('pedirMensajes', []), conversacion: leerLocal('pedirConversacion', null),
+        texto: '', ocupado: false, grabando: false, error: '', items: [], total: 0,
+        async init() {
+          try { this.negocio = await (await revisar(await fetch('/api/publico/negocio'))).json() } catch (e) { this.error = e.message }
+          if (this.negocio) document.title = `${this.negocio.nombre} · Hacé tu pedido`
+          this.bajar()
+        },
+        pesos: (v) => '$' + Math.round(v || 0).toLocaleString('es-AR'),
+        bajar() { this.$nextTick(() => { const c = this.$refs.chat; if (c) c.scrollTop = c.scrollHeight }) },
+        async enviar(datos, mostrar) {
+          this.mensajes.push({ de: 'cliente', texto: mostrar })
+          this.ocupado = true
+          this.error = ''
+          this.bajar()
+          try {
+            const r = await (await revisar(await fetch('/api/publico/chat', {
+              method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ conversacion: this.conversacion, ...datos }),
+            }))).json()
+            this.conversacion = r.conversacion
+            this.items = r.items
+            this.total = r.total
+            this.mensajes.push({ de: 'negocio', texto: r.respuesta })
+            guardarLocal('pedirMensajes', this.mensajes)
+            guardarLocal('pedirConversacion', this.conversacion)
+          } catch (e) { this.error = e.message } finally { this.ocupado = false; this.bajar() }
+        },
+        mandarTexto() {
+          const t = this.texto.trim()
+          if (!t) return
+          this.texto = ''
+          return this.enviar({ texto: t }, t)
+        },
+        async foto(e) {
+          const a = e.target.files[0]
+          e.target.value = ''
+          if (a) this.enviar({ imagen: await achicar(a), ...(this.texto.trim() ? { texto: this.texto.trim() } : {}) }, '📷 Foto')
+        },
+        async grabar() {
+          if (this.grabando) { this._rec.stop(); return }
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const partes = []
+            this._rec = new MediaRecorder(stream)
+            this._rec.ondataavailable = (ev) => partes.push(ev.data)
+            this._rec.onstop = async () => {
+              stream.getTracks().forEach((t) => t.stop())
+              this.grabando = false
+              const tipo = this._rec.mimeType || 'audio/webm'
+              this.ocupado = true
+              try {
+                const { texto } = await (await revisar(await fetch('/api/audio', { method: 'POST', headers: { 'x-extension': tipo.includes('mp4') ? 'mp4' : 'webm' }, body: new Blob(partes, { type: tipo }) }))).json()
+                this.ocupado = false
+                await this.enviar({ texto }, '🎤 ' + texto)
+              } catch (e) { this.error = e.message; this.ocupado = false }
+            }
+            this._rec.start()
+            this.grabando = true
+          } catch { this.error = 'No pude usar el micrófono.' }
+        },
+        nueva() { this.mensajes = []; this.conversacion = null; this.items = []; this.total = 0; guardarLocal('pedirMensajes', []); guardarLocal('pedirConversacion', null) },
+      }))
+    })
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+<main x-data="pedir" x-cloak>
+  <div class="cabecera">
+    <div class="emoji" x-text="negocio?.emoji || '🛍️'"></div>
+    <h2 x-text="negocio?.nombre || 'Cargando…'" style="margin:0"></h2>
+    <p x-text="negocio?.saludo"></p>
+  </div>
+  <p class="error" x-show="error" x-text="error" @click="error = ''"></p>
+  <div class="chat" x-ref="chat">
+    <div class="b negocio" x-show="!mensajes.length">¡Hola! 👋 Contame qué necesitás: podés escribir, mandar una foto de tu lista o un audio.</div>
+    <template x-for="(m, i) in mensajes" :key="i"><div class="b" :class="m.de" x-text="m.texto"></div></template>
+    <div class="b negocio pensando" x-show="ocupado">escribiendo…</div>
+  </div>
+  <form @submit.prevent="mandarTexto">
+    <label class="icono" title="Foto de tu lista">📷<input type="file" accept="image/*" @change="foto" :disabled="ocupado"></label>
+    <button type="button" class="outline" :class="{ rec: grabando }" @click="grabar" :disabled="ocupado && !grabando" x-text="grabando ? '⏹' : '🎤'" aria-label="Audio"></button>
+    <input type="text" x-model="texto" placeholder="Escribí tu pedido o consulta" aria-label="Mensaje" :disabled="ocupado">
+    <button type="submit" :disabled="ocupado || !texto.trim()">Enviar</button>
+  </form>
+  <p x-show="negocio?.ejemplo && !mensajes.length"><small><a href="#" @click.prevent="texto = negocio.ejemplo; mandarTexto()">💡 Probar con un ejemplo</a></small></p>
+  <article class="resumen" x-show="items.length">
+    <header><strong>🧾 Tu pedido</strong></header>
+    <ul style="padding:0">
+      <template x-for="it in items"><li><span x-text="it.cantidad + ' × ' + it.producto"></span><b x-text="it.precio == null ? 'a confirmar' : pesos(it.subtotal)"></b></li></template>
+    </ul>
+    <footer><strong x-text="'Total estimado: ' + pesos(total)"></strong> <small>· el negocio te lo confirma</small></footer>
+  </article>
+  <details>
+    <summary>Ver productos y precios</summary>
+    <ul><template x-for="p in negocio?.catalogo || []"><li><span x-text="p.producto"></span> <small x-text="p.precio == null ? '· consultar' : '· ' + pesos(p.precio) + ' / ' + p.unidad"></small></li></template></ul>
+  </details>
+  <p><small><a href="#" @click.prevent="nueva">Empezar un pedido nuevo</a> · Atendido con IA por Mostrador</small></p>
+</main>
+</body>
+</html>

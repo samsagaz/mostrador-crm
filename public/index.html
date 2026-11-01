@@ -1,0 +1,431 @@
+<!doctype html>
+<!-- Tema claro fijo: Pico sigue el modo oscuro del sistema, pero los gráficos no. -->
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mostrador · el CRM que no deja escapar ventas</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛎️</text></svg>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="app.js"></script>   <!-- antes que Alpine, para que escuche alpine:init -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+<div x-data="app" x-cloak>
+
+  <!-- ============ Barra superior ============ -->
+  <header class="barra">
+    <div class="marca">
+      <span class="logo" x-text="negocio?.emoji || '🛎️'"></span>
+      <div>
+        <strong x-text="negocio?.nombre || 'Mostrador'"></strong>
+        <small x-text="negocio ? negocio.rubro + ' · ' + negocio.ciudad : 'El CRM que no deja escapar ventas'"></small>
+      </div>
+    </div>
+    <template x-if="negocio">
+      <div class="acciones-barra">
+        <select x-model.number="yo" @change="cambiarUsuario" aria-label="Quién está usando Mostrador">
+          <template x-for="u in negocio.usuarios" :key="u.id">
+            <option :value="u.id" x-text="(u.rol === 'admin' ? '👑 ' : '👤 ') + u.nombre" :selected="u.id === yo"></option>
+          </template>
+        </select>
+        <a role="button" class="outline wa-boton" href="whatsapp.html" target="_blank" rel="noopener" :title="'WhatsApp en modo ' + (negocio.whatsapp?.modo === 'real' ? 'API real' : 'MOCK')">
+          <span x-text="negocio.whatsapp?.modo === 'real' ? '🟢 WhatsApp' : '🧪 WhatsApp'"></span></a>
+        <button class="campana outline" @click="irA('equipo')" :title="'Avisos de ' + nombreYo()">
+          🔔<span class="globo" x-show="avisosSinLeer" x-text="avisosSinLeer"></span>
+        </button>
+      </div>
+    </template>
+  </header>
+
+  <!-- ============ Alta: la IA adapta el CRM al rubro ============ -->
+  <main class="container" x-show="cargado && !negocio">
+    <article class="alta">
+      <hgroup>
+        <h1>Tu negocio pierde ventas en el WhatsApp. Mostrador las rescata.</h1>
+        <p>Contame qué negocio tenés y la IA arma tu CRM para ese rubro: catálogo, qué datos pedirle al cliente, cuánto puede esperar antes de comprarle a otro y una página de pedidos con QR.</p>
+      </hgroup>
+      <label>¿De qué rubro es?
+        <input x-model="alta.rubro" placeholder="Ej.: ferretería, rotisería, veterinaria, taller mecánico…">
+      </label>
+      <div class="chips">
+        <template x-for="r in RUBROS"><button class="chip" :class="{ activo: alta.rubro === r.rubro }" @click="elegirRubro(r)" x-text="r.emoji + ' ' + r.rubro"></button></template>
+      </div>
+      <div class="grid">
+        <label>Nombre del negocio <input x-model="alta.nombre" placeholder="Ej.: Ferretería El Tornillo"></label>
+        <label>Ciudad <input x-model="alta.ciudad" placeholder="Rosario"></label>
+      </div>
+      <div class="grid">
+        <label>Tu nombre (administrador) <input x-model="alta.admin" placeholder="Ej.: Vero"></label>
+        <label>Tu equipo, separado por comas <input x-model="alta.equipo" placeholder="Ej.: Lucas, Sofi"></label>
+      </div>
+      <details>
+        <summary>Tengo mi lista de precios (opcional)</summary>
+        <textarea x-model="alta.listaPrecios" rows="4" placeholder="Pegala como la tengas: &quot;Cemento 50kg 9800, Arena m3 25000…&quot;"></textarea>
+        <label>O una foto de la lista <input type="file" accept="image/*" @change="fotoLista"></label>
+        <small x-show="alta.imagen">📷 Foto lista para leer.</small>
+      </details>
+      <label><input type="checkbox" role="switch" x-model="alta.conEjemplos"> Cargar 10 ventas de ejemplo para ver el tablero lleno</label>
+      <button @click="crearNegocio" :aria-busy="ocupado" :disabled="ocupado || !alta.rubro.trim() || !alta.nombre.trim()">✨ Armar mi CRM con IA</button>
+    </article>
+    <section class="como-ia" x-html="COMO_USA_IA"></section>
+  </main>
+
+  <!-- ============ La app ============ -->
+  <template x-if="negocio && config">
+  <main class="container-fluid app">
+
+    <!-- KPIs: la plata, siempre a la vista -->
+    <section class="kpis">
+      <div class="kpi riesgo" @click="pestana = 'embudo'; soloRiesgo = true">
+        <small>💸 Ventas enfriándose</small>
+        <strong x-text="pesos(tablero?.kpis.enRiesgo)"></strong>
+        <span x-text="(tablero?.kpis.cantidadEnRiesgo || 0) + ' clientes esperan más de ' + horas(negocio.enfriaHoras)"></span>
+      </div>
+      <div class="kpi"><small>En juego</small><strong x-text="pesos(tablero?.kpis.enJuego)"></strong><span x-text="(tablero?.kpis.abiertas || 0) + ' ventas abiertas'"></span></div>
+      <div class="kpi ok"><small>Ganado</small><strong x-text="pesos(tablero?.kpis.ganado)"></strong><span>confirmado + entregado</span></div>
+      <div class="kpi"><small>Conversión</small><strong x-text="tablero?.kpis.conversion == null ? '—' : tablero.kpis.conversion + '%'"></strong><span>de las cerradas</span></div>
+      <div class="kpi"><small>Primera respuesta</small><strong x-text="minutos(tablero?.kpis.respuestaMin)"></strong><span>promedio</span></div>
+    </section>
+
+    <nav class="pestanas">
+      <template x-for="p in PESTANAS" :key="p.id">
+        <button :class="{ activa: pestana === p.id }" @click="irA(p.id)">
+          <span x-text="p.icono"></span> <span x-text="p.nombre"></span>
+          <span class="globo" x-show="p.id === 'embudo' && tablero?.kpis.cantidadEnRiesgo" x-text="tablero?.kpis.cantidadEnRiesgo"></span>
+        </button>
+      </template>
+    </nav>
+
+    <!-- ---------- Bandeja: entra un mensaje ---------- -->
+    <section x-show="pestana === 'bandeja'">
+      <div class="dos">
+        <article>
+          <header><strong>📥 Llegó un mensaje</strong> <small>Pegalo de WhatsApp, anotá la llamada, subí la foto de la lista o grabá el audio.</small></header>
+          <div class="canal">
+            <template x-for="c in ['whatsapp', 'telefono', 'instagram', 'mostrador']">
+              <label class="radio"><input type="radio" name="canal" :value="c" x-model="canal"> <span x-text="ICONO_CANAL[c] + ' ' + c"></span></label>
+            </template>
+          </div>
+          <textarea x-model="texto" rows="5" placeholder="Ej.: hola, soy Marta de Córdoba 1850, necesito 3 bolsas de cemento…" aria-label="Mensaje del cliente"></textarea>
+          <div role="group">
+            <button @click="leer" :aria-busy="ocupado" :disabled="ocupado || !texto.trim()">🧠 Leer con IA</button>
+            <button class="secondary" @click="usarEjemplo" :disabled="ocupado">Probar con un ejemplo</button>
+          </div>
+          <div class="grid">
+            <button class="outline" :class="{ grabando }" @click="grabar" :disabled="ocupado && !grabando" x-text="grabando ? '⏹️ Parar y leer' : '🎤 Grabar audio'"></button>
+            <label class="archivo">📷 Foto <input type="file" accept="image/*" @change="subirFoto" :disabled="ocupado"></label>
+            <label class="archivo">🎧 Audio de WhatsApp <input type="file" accept="audio/*,.opus,.ogg" @change="subirAudio" :disabled="ocupado"></label>
+          </div>
+        </article>
+
+        <article x-show="!ficha" class="vacio">
+          <p>🧠 La IA arma la ficha: quién es, qué quiere, cuánto suma con <em>tus</em> precios, qué falta preguntarle y qué tan cerca está de comprar.</p>
+          <p>Vos la revisás y la mandás al embudo. Desde ahí, Mostrador no te deja olvidarla.</p>
+        </article>
+
+        <template x-if="ficha">
+          <article class="ficha">
+            <header>
+              <span class="etiqueta" :class="ficha.tipo" x-text="TIPOS[ficha.tipo]"></span>
+              <span class="etiqueta" :class="'u-' + ficha.urgencia" x-text="'urgencia ' + ficha.urgencia"></span>
+              <span class="prob" :title="'Probabilidad de compra: ' + ficha.probabilidad + '%'"><i :style="'width:' + ficha.probabilidad + '%'"></i></span>
+              <small x-text="ficha.probabilidad + '% de que compre'"></small>
+            </header>
+            <p class="ia">🧠 <span x-text="ficha.analisis"></span></p>
+            <div class="grid">
+              <label>Cliente <input x-model="ficha.cliente" placeholder="—"></label>
+              <label>Teléfono <input x-model="ficha.telefono" placeholder="—"></label>
+            </div>
+            <label>Dirección <input x-model="ficha.direccion" placeholder="—"></label>
+            <table class="items">
+              <thead><tr><th>Cant.</th><th>Producto</th><th class="der">Precio</th><th class="der">Subtotal</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="(it, i) in ficha.items" :key="i">
+                  <tr>
+                    <td><input type="number" min="0" step="any" x-model.number="it.cantidad" @input="recalcular" aria-label="Cantidad"></td>
+                    <td><span x-text="it.producto"></span> <small x-show="it.nota" x-text="'· ' + it.nota"></small>
+                      <small class="aviso-cat" x-show="!it.enCatalogo">no está en el catálogo</small></td>
+                    <td class="der" x-text="it.precio == null ? 'a confirmar' : pesos(it.precio)"></td>
+                    <td class="der" x-text="it.precio == null ? '—' : pesos(it.precio * it.cantidad)"></td>
+                    <td><button class="mini outline secondary" @click="ficha.items.splice(i, 1); recalcular()" aria-label="Quitar">✕</button></td>
+                  </tr>
+                </template>
+              </tbody>
+              <tfoot><tr><th colspan="3">Total</th><th class="der" x-text="pesos(ficha.total)"></th><th></th></tr></tfoot>
+            </table>
+            <div x-show="ficha.faltaInfo.length" class="falta">
+              <strong>❓ Falta preguntarle</strong>
+              <ul><template x-for="p in ficha.faltaInfo"><li x-text="p"></li></template></ul>
+            </div>
+            <p><strong>👉 Próxima acción:</strong> <span x-text="ficha.proximaAccion"></span></p>
+            <div role="group">
+              <button @click="guardarFicha" :aria-busy="guardando" :disabled="guardando || ficha.tipo === 'no_es_venta'">Mandar al embudo</button>
+              <button class="secondary outline" @click="ficha = null">Descartar</button>
+            </div>
+          </article>
+        </template>
+      </div>
+    </section>
+
+    <!-- ---------- Embudo ---------- -->
+    <section x-show="pestana === 'embudo'">
+      <div class="filtros">
+        <label><input type="checkbox" role="switch" x-model="soloMias"> Solo las mías</label>
+        <label><input type="checkbox" role="switch" x-model="soloRiesgo"> Solo las que se enfrían</label>
+        <input type="search" x-model="buscar" placeholder="Buscar cliente o producto" aria-label="Buscar">
+      </div>
+      <div class="kanban">
+        <template x-for="e in ETAPAS" :key="e.id">
+          <div class="columna" :class="e.id" @dragover.prevent @drop="soltar(e.id)">
+            <h4><span x-text="e.icono + ' ' + e.nombre"></span> <small x-text="columna(e.id).length + ' · ' + pesos(sumar(columna(e.id)))"></small></h4>
+            <template x-for="o in columna(e.id)" :key="o.id">
+              <div class="tarjeta" :class="{ riesgo: o.enRiesgo, sonando: o.avisoVencido }" draggable="true" @dragstart="arrastrando = o.id" @click="abrir(o)">
+                <div class="fila"><strong x-text="o.cliente || 'Sin nombre'"></strong><span x-text="pesos(o.total)"></span></div>
+                <small x-text="o.resumen"></small>
+                <div class="fila meta">
+                  <span x-text="ICONO_CANAL[o.canal] || '💬'" :title="o.canal"></span>
+                  <span x-show="o.responsable" x-text="'👤 ' + o.responsable"></span>
+                  <span :class="{ rojo: o.enRiesgo }" x-text="(o.enRiesgo ? '🔥 ' : '⏱ ') + hace(o.horasSinRespuesta)"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- ---------- Tablero ---------- -->
+    <section x-show="pestana === 'tablero'">
+      <article class="prioridades">
+        <header>
+          <strong>🎯 ¿Por dónde empiezo hoy?</strong>
+          <button @click="pedirPrioridades" :aria-busy="pensando" :disabled="pensando">Preguntarle a la IA</button>
+        </header>
+        <template x-if="prioridades">
+          <div>
+            <p class="ia">🧠 <span x-text="prioridades.analisis"></span></p>
+            <ol>
+              <template x-for="p in prioridades.prioridades" :key="p.id">
+                <li><a href="#" @click.prevent="abrirId(p.id)" x-text="p.accion"></a><br><small x-text="p.porque"></small></li>
+              </template>
+            </ol>
+          </div>
+        </template>
+      </article>
+      <div class="graficos">
+        <article><header>Plata por etapa del embudo</header><div class="grafico"><canvas id="gEtapas"></canvas></div></article>
+        <article><header>Entran vs. se cierran (7 días)</header><div class="grafico"><canvas id="gDias"></canvas></div></article>
+        <article><header>Por dónde llegan</header><div class="grafico"><canvas id="gCanales"></canvas></div></article>
+        <article><header>Lo más pedido</header><div class="grafico"><canvas id="gProductos"></canvas></div></article>
+      </div>
+      <div class="dos">
+        <article>
+          <header>🕵️ Te lo piden y no está en tu catálogo</header>
+          <p x-show="!tablero?.sinCatalogo.length"><small>Nada por ahora.</small></p>
+          <ul><template x-for="s in tablero?.sinCatalogo || []"><li><span x-text="s.producto"></span> <small x-text="'· ' + s.veces + ' pedido(s) abiertos'"></small></li></template></ul>
+        </article>
+        <article>
+          <header>💔 Por qué se pierden</header>
+          <p x-show="!tablero?.motivosPerdida.length"><small>Ninguna perdida todavía.</small></p>
+          <ul><template x-for="m in tablero?.motivosPerdida || []"><li><span x-text="m.motivo"></span> <small x-text="'· ' + m.veces"></small></li></template></ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ---------- Equipo y avisos ---------- -->
+    <section x-show="pestana === 'equipo'">
+      <div class="dos">
+        <article>
+          <header>
+            <strong x-text="'🔔 Avisos de ' + nombreYo()"></strong>
+            <button class="outline mini-texto" @click="activarNotificaciones" x-show="permisoNotif !== 'granted'">Activar notificaciones</button>
+            <small x-show="permisoNotif === 'granted'">✅ Notificaciones del navegador activas</small>
+          </header>
+          <p x-show="!avisos.length"><small>Sin avisos. Cuando una venta espere más de <b x-text="negocio.recordatorioMin"></b> min sin movimiento, te aviso acá, con sonido y en el escritorio.</small></p>
+          <ul class="avisos">
+            <template x-for="a in avisos" :key="a.id">
+              <li>
+                <a href="#" @click.prevent="abrirId(a.oportunidad)" x-text="'⏰ ' + a.texto"></a>
+                <small x-text="' · ' + hora(a.creado)"></small>
+                <a x-show="a.whatsapp" :href="a.whatsapp" target="_blank" rel="noopener"> · reenviar por WhatsApp</a>
+              </li>
+            </template>
+          </ul>
+        </article>
+        <article class="wa-config">
+          <header><strong>💬 Conexión de WhatsApp</strong></header>
+          <fieldset>
+            <label><input type="radio" value="mock" x-model="config.whatsapp.modo"> <b>MOCK (demo)</b> — los mensajes llegan desde el <a href="whatsapp.html" target="_blank" rel="noopener">simulador de WhatsApp</a>, con el mismo formato que la API real.</label>
+            <label><input type="radio" value="real" x-model="config.whatsapp.modo"> <b>API real</b> — WhatsApp Cloud API de Meta.</label>
+          </fieldset>
+          <label><input type="checkbox" role="switch" x-model="config.whatsapp.autoResponder"> La IA contesta sola al cliente (si no, arma la ficha y contesta una persona)</label>
+          <div x-show="config.whatsapp.modo === 'real'">
+            <label>Token de acceso (permanente o de sistema) <input type="password" x-model="config.whatsapp.token" placeholder="EAAG…" autocomplete="off"></label>
+            <label>Phone Number ID <input x-model="config.whatsapp.phoneNumberId" placeholder="1234567890" autocomplete="off"></label>
+            <label>App Secret (opcional, valida la firma de Meta) <input type="password" x-model="config.whatsapp.appSecret" autocomplete="off"></label>
+            <label>Verify token <input x-model="config.whatsapp.verifyToken"></label>
+            <small>En Meta for Developers → WhatsApp → Configuración: URL de callback <code x-text="location.origin + '/webhook/whatsapp'"></code>, el verify token de arriba y suscribite a <code>messages</code>.</small>
+          </div>
+          <button @click="guardarConfig" :aria-busy="guardando">Guardar conexión</button>
+        </article>
+        <article>
+          <header><strong>⚙️ Reglas de seguimiento</strong></header>
+          <label>Avisarle al responsable cada <input type="number" min="1" x-model.number="config.recordatorioMin" class="corto"> minutos mientras la venta no se mueva</label>
+          <label>Si después de <input type="number" min="1" x-model.number="config.escalarTras" class="corto"> avisos nadie la mueve, avisarle también al administrador</label>
+          <label>Una venta "se enfría" tras <input type="number" min="0.25" step="0.25" x-model.number="config.enfriaHoras" class="corto"> horas sin respuesta <small>(la IA lo sugirió para tu rubro)</small></label>
+          <h6>Equipo</h6>
+          <template x-for="(u, i) in config.usuarios" :key="u.id">
+            <div role="group" class="usuario">
+              <input x-model="u.nombre" aria-label="Nombre">
+              <input x-model="u.telefono" placeholder="WhatsApp (opcional)" aria-label="Teléfono">
+              <select x-model="u.rol" aria-label="Rol"><option value="admin">👑 admin</option><option value="vendedor">👤 vendedor</option></select>
+              <button class="outline secondary" @click="config.usuarios.splice(i, 1)" :disabled="config.usuarios.length < 2" aria-label="Quitar">✕</button>
+            </div>
+          </template>
+          <div role="group">
+            <button class="outline" @click="agregarUsuario">+ Sumar persona</button>
+            <button @click="guardarConfig" :aria-busy="guardando">Guardar</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ---------- Mi negocio: QR y catálogo ---------- -->
+    <section x-show="pestana === 'negocio'">
+      <div class="dos">
+        <article class="qr-tarjeta" id="cartel">
+          <h3 x-text="negocio.emoji + ' ' + negocio.nombre"></h3>
+          <p>Hacé tu pedido o consulta acá, te contestamos al toque 👇</p>
+          <div id="qr" class="qr"></div>
+          <p><a :href="urlPedidos()" target="_blank" rel="noopener" x-text="urlPedidos()"></a></p>
+          <div role="group" class="no-imprimir">
+            <button @click="window.print()">🖨️ Imprimir cartel para el mostrador</button>
+            <button class="outline" @click="copiar(urlPedidos())">Copiar link (para Instagram/WhatsApp)</button>
+          </div>
+          <small class="no-imprimir">Cada pedido que entra por el QR cae solo en el embudo, con su responsable y sus avisos.</small>
+          <hr class="no-imprimir">
+          <div class="no-imprimir sim-qr">
+            <div id="qrWa" class="qr chico"></div>
+            <div><strong>📱 Probalo en tu celular</strong><p><small>Escaneá y escribile al negocio desde el simulador de WhatsApp (modo MOCK). Mirá cómo cae en el embudo en vivo.</small></p>
+              <a href="whatsapp.html" target="_blank" rel="noopener">Abrir simulador</a></div>
+          </div>
+        </article>
+        <article>
+          <header><strong>📦 Catálogo y precios</strong> <small>La IA usa estos precios; nunca los inventa.</small></header>
+          <p class="ia" x-show="negocio.analisis">🧠 <span x-text="negocio.analisis"></span></p>
+          <table class="catalogo">
+            <thead><tr><th>Producto</th><th>Unidad</th><th class="der">Precio</th><th></th></tr></thead>
+            <tbody>
+              <template x-for="(p, i) in config.catalogo" :key="i">
+                <tr>
+                  <td><input x-model="p.producto" aria-label="Producto"></td>
+                  <td><input x-model="p.unidad" class="corto" aria-label="Unidad"></td>
+                  <td><input type="number" min="0" x-model.number="p.precio" placeholder="sin precio" aria-label="Precio"></td>
+                  <td><button class="mini outline secondary" @click="config.catalogo.splice(i, 1)" aria-label="Quitar">✕</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div role="group">
+            <button class="outline" @click="config.catalogo.push({ producto: '', unidad: 'u', precio: null })">+ Producto</button>
+            <button @click="guardarConfig" :aria-busy="guardando">Guardar precios</button>
+          </div>
+          <p><small><b>Datos que la IA le pide a cada cliente:</b> <span x-text="negocio.datosParaCerrar.join(' · ')"></span></small></p>
+          <button class="secondary outline" @click="cambiarRubro">🔄 Empezar de nuevo con otro rubro</button>
+        </article>
+      </div>
+    </section>
+
+    <section x-show="pestana === 'ia'" class="como-ia" x-html="COMO_USA_IA"></section>
+  </main>
+  </template>
+
+  <!-- ============ Detalle de una venta ============ -->
+  <dialog :open="!!sel" @keydown.escape.window="sel = null">
+    <template x-if="sel">
+      <article class="detalle">
+        <header>
+          <button aria-label="Cerrar" rel="prev" @click="sel = null"></button>
+          <strong x-text="'#' + sel.id + ' · ' + (sel.cliente || 'Sin nombre')"></strong>
+          <span class="etiqueta" :class="sel.tipo" x-text="TIPOS[sel.tipo]"></span>
+          <span class="etiqueta rojo" x-show="sel.enRiesgo">🔥 se enfría</span>
+        </header>
+        <div class="etapas">
+          <template x-for="e in ETAPAS" :key="e.id">
+            <button :class="{ activa: sel.etapa === e.id, outline: sel.etapa !== e.id }" @click="moverA(sel, e.id)" x-text="e.icono + ' ' + e.nombre"></button>
+          </template>
+        </div>
+        <div class="grid">
+          <div>
+            <p><small x-text="ICONO_CANAL[sel.canal] + ' ' + sel.canal + ' · ' + (sel.telefono || 'sin teléfono') + (sel.direccion ? ' · ' + sel.direccion : '')"></small></p>
+            <p class="ia">🧠 <span x-text="sel.analisis"></span></p>
+            <ul class="lista-items">
+              <template x-for="it in sel.items"><li><span x-text="it.cantidad + ' × ' + it.producto"></span> <b x-text="it.subtotal == null ? 'a confirmar' : pesos(it.subtotal)"></b></li></template>
+            </ul>
+            <p><strong>Total: <span x-text="pesos(sel.total)"></span></strong> <small x-show="sel.sinPrecio" x-text="'(' + sel.sinPrecio + ' sin precio)'"></small></p>
+            <div class="falta" x-show="sel.faltaInfo?.length"><strong>❓ Falta</strong><ul><template x-for="p in sel.faltaInfo"><li x-text="p"></li></template></ul></div>
+            <label>Responsable
+              <select @change="asignar(sel, Number($event.target.value))">
+                <template x-for="u in negocio.usuarios" :key="u.id"><option :value="u.id" :selected="u.id === sel.asignado" x-text="u.nombre"></option></template>
+              </select>
+            </label>
+            <div class="posponer">
+              <small>⏰ Recordarme en:</small>
+              <button class="mini-texto outline" @click="posponer(sel, 15)">15 min</button>
+              <button class="mini-texto outline" @click="posponer(sel, 60)">1 h</button>
+              <button class="mini-texto outline" @click="posponer(sel, 240)">4 h</button>
+              <button class="mini-texto outline" @click="posponer(sel, 1440)">mañana</button>
+            </div>
+            <small x-show="sel.proximoAviso" x-text="'Próximo aviso: ' + hora(sel.proximoAviso) + ' a ' + (sel.responsable || 'admin')"></small>
+          </div>
+          <div>
+            <div class="chat">
+              <template x-for="m in sel.mensajes || []">
+                <div class="burbuja" :class="m.de"><span x-text="m.texto"></span><small x-text="hora(m.fecha) + (m.ia ? ' · IA' : '')"></small></div>
+              </template>
+            </div>
+            <div role="group">
+              <button @click="redactar(sel, 'respuesta')" :aria-busy="redactando" :disabled="redactando">✍️ Redactar respuesta</button>
+              <button class="contrast" @click="redactar(sel, 'rescate')" :aria-busy="redactando" :disabled="redactando">🚑 Rescatar venta</button>
+            </div>
+            <template x-if="borrador">
+              <div>
+                <small class="ia" x-text="'🧠 ' + borrador.analisis"></small>
+                <textarea x-model="borrador.mensaje" rows="5" aria-label="Mensaje para el cliente"></textarea>
+                <div role="group">
+                  <button @click="enviarWa(sel)" :disabled="!sel.telefono || guardando" :aria-busy="guardando" :title="sel.telefono ? '' : 'Esta venta no tiene teléfono'"
+                    x-text="negocio.whatsapp?.modo === 'real' ? '💬 Enviar por WhatsApp' : '💬 Enviar por WhatsApp (MOCK)'"></button>
+                  <a role="button" class="outline" :href="linkWa(sel.telefono, borrador.mensaje)" target="_blank" rel="noopener" @click="enviado(sel)">📲 Abrir wa.me</a>
+                  <button class="outline secondary" @click="copiar(borrador.mensaje); enviado(sel)">Copiar</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <h6>Historial del caso</h6>
+        <form class="nota" @submit.prevent="agregarNota(sel)">
+          <input x-model="nota" placeholder="Agregar una nota (ej.: llamé y no atendió)" aria-label="Nota">
+          <button type="submit" :disabled="!nota.trim()">Anotar</button>
+        </form>
+        <ul class="linea-tiempo">
+          <template x-for="ev in [...(sel.eventos || [])].reverse()">
+            <li><small x-text="fechaHora(ev.fecha)"></small> <span x-text="ev.texto"></span> <small x-show="ev.quien" x-text="'— ' + ev.quien"></small></li>
+          </template>
+        </ul>
+      </article>
+    </template>
+  </dialog>
+
+  <div class="toasts">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="toast" :class="t.tipo" @click="t.op ? abrirId(t.op) : null; toasts = toasts.filter((x) => x !== t)" x-text="t.texto"></div>
+    </template>
+  </div>
+  <p class="error-flotante" role="alert" x-show="error" x-text="error" @click="error = ''"></p>
+</div>
+</body>
+</html>

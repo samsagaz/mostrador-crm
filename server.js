@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
@@ -29,6 +29,9 @@ db.exec(`
     id INTEGER PRIMARY KEY, creado TEXT NOT NULL, actualizado TEXT NOT NULL, etapa TEXT NOT NULL, datos TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS cache (clave TEXT PRIMARY KEY, valor TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS wa_mensajes (
+    id INTEGER PRIMARY KEY, fecha TEXT NOT NULL, telefono TEXT NOT NULL, de TEXT NOT NULL, texto TEXT NOT NULL, waid TEXT UNIQUE
+  );
   CREATE TABLE IF NOT EXISTS avisos (
     id INTEGER PRIMARY KEY, creado TEXT NOT NULL, usuario INTEGER NOT NULL, oportunidad INTEGER NOT NULL, texto TEXT NOT NULL
   );
@@ -112,7 +115,14 @@ app.use(logger())
 
 app.get('/api/health', (c) => c.json({ ok: true, modelo: MODEL, negocio: leerNegocio()?.nombre ?? null }))
 
-app.get('/api/negocio', (c) => c.json(leerNegocio()))
+// Los secretos de WhatsApp nunca vuelven a la página: solo si están cargados.
+const enmascarar = (s) => (s ? '••••' + String(s).slice(-4) : null)
+function negocioPublico(n) {
+  if (!n) return null
+  const wa = n.whatsapp || {}
+  return { ...n, whatsapp: { ...wa, token: enmascarar(wa.token), appSecret: enmascarar(wa.appSecret) } }
+}
+app.get('/api/negocio', (c) => c.json(negocioPublico(leerNegocio())))
 
 app.post('/api/negocio', async (c) => {
   const body = AltaNegocio(await c.req.json())
@@ -143,13 +153,14 @@ app.post('/api/negocio', async (c) => {
     ],
     recordatorioMin: 15,
     escalarTras: 2,
+    whatsapp: { modo: 'mock', autoResponder: true, token: null, phoneNumberId: null, verifyToken: 'mostrador-' + Math.random().toString(36).slice(2, 8), appSecret: null },
     creado: ahora(),
   }
   db.prepare('DELETE FROM oportunidades').run()
   db.prepare('DELETE FROM avisos').run()
   guardarNegocio(negocio)
   if (body.conEjemplos !== false) cargarEjemplos(negocio)
-  return c.json(negocio, 201)
+  return c.json(negocioPublico(negocio), 201)
 })
 
 const EdicionNegocio = type({
@@ -158,6 +169,10 @@ const EdicionNegocio = type({
   enfriaHoras: '0 < number <= 72',
   recordatorioMin: '1 <= number <= 1440',
   escalarTras: '1 <= number <= 10',
+  'whatsapp?': {
+    modo: "'mock' | 'real'", autoResponder: 'boolean',
+    token: 'string | null', phoneNumberId: 'string | null', verifyToken: 'string <= 100', appSecret: 'string | null',
+  },
   usuarios: type({ id: 'number', nombre: '0 < string <= 60', rol: "'admin' | 'vendedor'", telefono: 'string | null' }).array().atLeastLength(1).atMostLength(20),
   catalogo: type({ producto: '0 < string <= 120', unidad: 'string <= 20', precio: 'number | null' }).array().atMostLength(80),
 })
@@ -168,13 +183,23 @@ app.put('/api/negocio', async (c) => {
   const body = EdicionNegocio(await c.req.json())
   if (body instanceof type.errors) return c.json({ error: body.summary }, 400)
   if (!body.usuarios.some((u) => u.rol === 'admin')) return c.json({ error: 'Tiene que quedar al menos un administrador.' }, 400)
+  if (body.whatsapp) {
+    const viejo = negocio.whatsapp || {}
+    // Si llega enmascarado o vacío, queda el que estaba.
+    const secreto = (nuevo, antes) => (!nuevo || nuevo.startsWith('••••') ? antes : nuevo.trim())
+    body.whatsapp = { ...body.whatsapp, token: secreto(body.whatsapp.token, viejo.token), appSecret: secreto(body.whatsapp.appSecret, viejo.appSecret),
+      phoneNumberId: body.whatsapp.phoneNumberId?.trim() || null }
+    if (body.whatsapp.modo === 'real' && !(body.whatsapp.token || process.env.WHATSAPP_TOKEN) ) return c.json({ error: 'Para la API real de WhatsApp falta el token de acceso.' }, 400)
+    if (body.whatsapp.modo === 'real' && !body.whatsapp.phoneNumberId) return c.json({ error: 'Para la API real de WhatsApp falta el Phone Number ID.' }, 400)
+  }
   Object.assign(negocio, body)
   guardarNegocio(negocio)
-  return c.json(negocio)
+  return c.json(negocioPublico(negocio))
 })
 
 app.delete('/api/negocio', (c) => {
   db.prepare('DELETE FROM avisos').run()
+  db.prepare('DELETE FROM wa_mensajes').run()
   db.prepare('DELETE FROM oportunidades').run()
   db.prepare('DELETE FROM negocio').run()
   return c.json({ ok: true })
@@ -510,6 +535,30 @@ app.get('/api/publico/negocio', (c) => {
     catalogo: n.catalogo, ejemplo: n.ejemplos[0] || null })
 })
 
+// Atiende un mensaje de un cliente (web o WhatsApp): la IA lee toda la charla, actualiza la ficha
+// y escribe la respuesta. La venta queda "nueva" hasta que alguien del negocio la tome.
+async function atender({ negocio, op, canal, texto, imagen, telefono = null, nombre = null, origen }) {
+  const mensajes = [...(op?.mensajes || []), { de: 'cliente', texto: texto || '[mandó una foto]', fecha: ahora() }]
+  const historia = mensajes.slice(-12).map((m) => ({ role: m.de === 'cliente' ? 'user' : 'assistant', content: m.texto }))
+  if (imagen) {
+    historia[historia.length - 1] = { role: 'user', content: [
+      { type: 'text', text: texto || 'Te mando una foto de lo que necesito:' },
+      { type: 'image_url', image_url: { url: imagen } },
+    ] }
+  }
+  const extra = telefono ? `\nEl cliente escribe desde WhatsApp: su teléfono es ${telefono}${nombre ? ` y su nombre de perfil es "${nombre}"` : ''}. Usalos en la ficha y no se los pidas.` : ''
+  const r = await pedirJSON(formatoCharla, [{ role: 'system', content: PROMPT_CHARLA(negocio) + extra }, ...historia])
+  const { respuesta, ...lectura } = r
+  mensajes.push({ de: 'negocio', texto: respuesta, fecha: ahora(), ia: true })
+  const nueva = { ...(op || {}), ...conPrecios(lectura, negocio), canal, mensajes }
+  if (telefono) nueva.telefono = telefono
+  if (!nueva.cliente && nombre) nueva.cliente = nombre
+  if (!op) nacer(nueva, negocio, origen)
+  nueva.ultimaActividad = op?.ultimaActividad || ahora()
+  const id = lectura.tipo === 'no_es_venta' && !op ? null : guardarOportunidad(nueva)
+  return { id, respuesta, nueva, lectura }
+}
+
 app.post('/api/publico/chat', async (c) => {
   const negocio = leerNegocio()
   if (!negocio) return c.json({ error: 'Este negocio todavía no está configurado.' }, 404)
@@ -518,28 +567,157 @@ app.post('/api/publico/chat', async (c) => {
   const body = MensajePublico(await c.req.json())
   if (body instanceof type.errors) return c.json({ error: 'El mensaje es muy largo o la imagen no es válida.' }, 400)
   if (!body.texto && !body.imagen) return c.json({ error: 'Escribí tu pedido o consulta.' }, 400)
-
   let op = body.conversacion ? leerOportunidad(body.conversacion) : null
   if (op && op.canal !== 'web') op = null
-  const mensajes = [...(op?.mensajes || []), { de: 'cliente', texto: body.texto || '[mandó una foto]', fecha: ahora() }]
-
-  const historia = mensajes.slice(-12).map((m) => ({ role: m.de === 'cliente' ? 'user' : 'assistant', content: m.texto }))
-  if (body.imagen) {
-    historia[historia.length - 1] = { role: 'user', content: [
-      { type: 'text', text: body.texto || 'Te mando una foto de lo que necesito:' },
-      { type: 'image_url', image_url: { url: body.imagen } },
-    ] }
-  }
-  const r = await pedirJSON(formatoCharla, [{ role: 'system', content: PROMPT_CHARLA(negocio) }, ...historia])
-  const { respuesta, ...lectura } = r
-  mensajes.push({ de: 'negocio', texto: respuesta, fecha: ahora(), ia: true })
-
-  const nueva = { ...(op || {}), ...conPrecios(lectura, negocio), canal: 'web', mensajes }
-  if (!op) nacer(nueva, negocio, 'la web (QR)')
-  // La IA contestó al toque, pero el negocio todavía no: la venta sigue "nueva" hasta que alguien la tome.
-  nueva.ultimaActividad = op?.ultimaActividad || ahora()
-  const id = lectura.tipo === 'no_es_venta' && !op ? null : guardarOportunidad(nueva)
+  const { id, respuesta, nueva, lectura } = await atender({ negocio, op, canal: 'web', texto: body.texto, imagen: body.imagen, origen: 'la web (QR)' })
   return c.json({ conversacion: id, respuesta, items: nueva.items, total: nueva.total, faltaInfo: lectura.faltaInfo })
+})
+
+// ---------------------------------------------------------------------------
+// 6b. WhatsApp: el mismo webhook para la API real de Meta (Cloud API) y para el simulador (MOCK).
+//     El simulador manda exactamente el JSON que manda Meta, así el camino del código es uno solo.
+// ---------------------------------------------------------------------------
+const GRAPH = 'https://graph.facebook.com/v21.0'
+const mediaMock = new Map()   // id → { buffer, mime } (lo que el simulador "sube")
+const registrarWa = db.prepare('INSERT OR IGNORE INTO wa_mensajes (fecha, telefono, de, texto, waid) VALUES (?, ?, ?, ?, ?)')
+const soloDigitos = (t) => String(t || '').replace(/\D/g, '')
+
+function configWa(negocio) {
+  const wa = negocio?.whatsapp || { modo: 'mock', autoResponder: true }
+  return { ...wa, token: wa.token || process.env.WHATSAPP_TOKEN || null }
+}
+
+// Manda un texto por WhatsApp. En MOCK queda en la bandeja del simulador; en real va por la Cloud API.
+async function enviarWhatsapp(negocio, telefono, texto) {
+  const wa = configWa(negocio)
+  const tel = soloDigitos(telefono)
+  if (!tel) throw new Error('Esta venta no tiene teléfono para mandarle un WhatsApp.')
+  if (wa.modo === 'real') {
+    const r = await fetch(`${GRAPH}/${wa.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${wa.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'text', text: { body: texto } }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(`WhatsApp rechazó el mensaje: ${j.error?.message || r.status}`)
+  }
+  registrarWa.run(ahora(), tel, 'negocio', texto, null)
+}
+
+async function bajarMedia(negocio, id) {
+  if (mediaMock.has(id)) return mediaMock.get(id)
+  const wa = configWa(negocio)
+  const meta = await (await fetch(`${GRAPH}/${id}`, { headers: { authorization: `Bearer ${wa.token}` } })).json()
+  const r = await fetch(meta.url, { headers: { authorization: `Bearer ${wa.token}` } })
+  return { buffer: Buffer.from(await r.arrayBuffer()), mime: meta.mime_type || r.headers.get('content-type') }
+}
+
+async function transcribir(buffer, ext) {
+  return conCache('audio:' + hash([MODEL_AUDIO, createHash('sha256').update(buffer).digest('hex')]), async () =>
+    (await openai.audio.transcriptions.create({ file: await toFile(buffer, `audio.${ext}`), model: MODEL_AUDIO, language: 'es' })).text)
+}
+
+// Un mensaje entrante de WhatsApp (ya sacado del JSON de Meta).
+async function recibirWhatsapp(negocio, m, contacto) {
+  const tel = soloDigitos(m.from)
+  let texto = null, imagen = null
+  if (m.type === 'text') texto = m.text?.body
+  else if (m.type === 'audio') {
+    const { buffer, mime } = await bajarMedia(negocio, m.audio.id)
+    const ext = /mp4|m4a/.test(mime) ? 'mp4' : /mpeg|mp3/.test(mime) ? 'mp3' : /webm/.test(mime) ? 'webm' : 'ogg'
+    texto = '🎤 ' + await transcribir(buffer, ext)
+  } else if (m.type === 'image') {
+    const { buffer, mime } = await bajarMedia(negocio, m.image.id)
+    imagen = `data:${mime || 'image/jpeg'};base64,${buffer.toString('base64')}`
+    texto = m.image.caption || null
+  } else texto = `[mandó un mensaje de tipo ${m.type}]`
+  // waid único: si Meta reenvía el mismo mensaje, no se atiende dos veces.
+  const nuevo = registrarWa.run(ahora(), tel, 'cliente', texto || '📷 [foto]', m.id || null).changes
+  if (!nuevo) return
+
+  // La venta abierta de este teléfono, o una nueva.
+  const op = listarOportunidades().find((o) => soloDigitos(o.telefono) === tel && ABIERTAS.includes(o.etapa) && o.canal === 'whatsapp') || null
+  const wa = configWa(negocio)
+  if (!wa.autoResponder) {
+    // Sin respuesta automática: la IA igual arma la ficha, pero contesta una persona.
+    const lectura = conPrecios(await pedirJSON(formatoLectura, [
+      { role: 'system', content: PROMPT_LECTURA(negocio) },
+      { role: 'user', content: [...(op?.mensajes || []).filter((x) => x.de === 'cliente').map((x) => x.texto), texto || '[foto]'].join('\n') },
+    ]), negocio)
+    const nueva = { ...(op || {}), ...lectura, canal: 'whatsapp', telefono: tel, cliente: lectura.cliente || op?.cliente || contacto?.profile?.name || null,
+      mensajes: [...(op?.mensajes || []), { de: 'cliente', texto: texto || '[foto]', fecha: ahora() }] }
+    if (!op) { nacer(nueva, negocio, 'WhatsApp'); nueva.ultimaActividad = ahora() }
+    guardarOportunidad(nueva)
+    return
+  }
+  const { respuesta } = await atender({ negocio, op, canal: 'whatsapp', texto, imagen, telefono: tel, nombre: contacto?.profile?.name, origen: 'WhatsApp' })
+  await enviarWhatsapp(negocio, tel, respuesta)
+}
+
+// Verificación del webhook (Meta la pide una vez al configurarlo).
+app.get('/webhook/whatsapp', (c) => {
+  const wa = configWa(leerNegocio())
+  if (c.req.query('hub.mode') === 'subscribe' && c.req.query('hub.verify_token') === wa.verifyToken) return c.text(c.req.query('hub.challenge') || '')
+  return c.text('Token de verificación incorrecto', 403)
+})
+
+app.post('/webhook/whatsapp', async (c) => {
+  const negocio = leerNegocio()
+  if (!negocio) return c.json({ error: 'Negocio sin configurar.' }, 404)
+  const crudo = await c.req.text()
+  const wa = configWa(negocio)
+  const esMock = c.req.header('x-mostrador-mock') === '1'
+  if (esMock && wa.modo !== 'mock') return c.json({ error: 'El simulador está apagado: WhatsApp está en modo API real.' }, 409)
+  // En modo real, si hay App Secret, se valida la firma de Meta.
+  if (!esMock && wa.appSecret) {
+    const firma = c.req.header('x-hub-signature-256') || ''
+    const esperada = 'sha256=' + createHmac('sha256', wa.appSecret).update(crudo).digest('hex')
+    if (firma.length !== esperada.length || !timingSafeEqual(Buffer.from(firma), Buffer.from(esperada))) return c.text('Firma inválida', 401)
+  }
+  const cuerpo = JSON.parse(crudo)
+  const tareas = []
+  for (const entry of cuerpo.entry || []) for (const ch of entry.changes || []) {
+    const v = ch.value || {}
+    for (const m of v.messages || []) {
+      const contacto = (v.contacts || []).find((x) => x.wa_id === m.from) || v.contacts?.[0]
+      tareas.push(recibirWhatsapp(negocio, m, contacto).catch((err) => {
+        console.error('whatsapp:', err)
+        registrarWa.run(ahora(), soloDigitos(m.from), 'sistema', '⚠️ ' + (err instanceof OpenAI.RateLimitError ? 'La IA está saturada, te contestamos enseguida.' : 'No pudimos procesar el mensaje, te contestamos enseguida.'), null)
+      }))
+    }
+  }
+  // Meta espera un 200 rápido: en real se procesa de fondo. El simulador espera para mostrar todo junto.
+  if (esMock) await Promise.all(tareas)
+  return c.json({ ok: true })
+})
+
+// Simulador: "sube" un audio o una foto como lo haría WhatsApp, y lee la charla de un teléfono.
+app.post('/api/wa-mock/media', async (c) => {
+  const buffer = Buffer.from(await c.req.arrayBuffer())
+  if (!buffer.length || buffer.length > 16 * 1024 * 1024) return c.json({ error: 'El archivo está vacío o pesa más de 16 MB.' }, 400)
+  const id = 'mock-' + createHash('sha256').update(buffer).digest('hex').slice(0, 16)
+  mediaMock.set(id, { buffer, mime: c.req.header('content-type') || 'application/octet-stream' })
+  return c.json({ id })
+})
+app.get('/api/wa-mock/chat', (c) => {
+  const tel = soloDigitos(c.req.query('telefono'))
+  return c.json(db.prepare('SELECT id, fecha, de, texto FROM wa_mensajes WHERE telefono = ? ORDER BY id').all(tel))
+})
+app.get('/api/wa/estado', (c) => {
+  const n = leerNegocio()
+  const wa = configWa(n)
+  return c.json({ modo: wa.modo, autoResponder: wa.autoResponder, negocio: n?.nombre, emoji: n?.emoji, listo: wa.modo === 'mock' || !!(wa.token && wa.phoneNumberId) })
+})
+
+// Mandar desde el CRM por WhatsApp (MOCK → aparece en el simulador; real → Cloud API).
+app.post('/api/oportunidades/:id/enviar', async (c) => {
+  const op = leerOportunidad(Number(c.req.param('id')))
+  if (!op) return c.json({ error: 'No existe esa oportunidad.' }, 404)
+  const { mensaje, quien } = await c.req.json()
+  if (!mensaje?.trim()) return c.json({ error: 'El mensaje está vacío.' }, 400)
+  await enviarWhatsapp(leerNegocio(), op.telefono, mensaje.trim())
+  return c.json({ ok: true, modo: configWa(leerNegocio()).modo })
 })
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WhatsApp (simulador) · Mostrador</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
+  <style>
+    :root { --verde: #008069; --fondo: #efeae2; --mio: #d9fdd3; --texto: #111b21; --gris: #667781; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--texto); background: #d1d7db; }
+    [x-cloak] { display: none !important; }
+    .tel { max-width: 440px; height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; background: var(--fondo); box-shadow: 0 0 30px #0002; }
+    @media (min-width: 600px) { .tel { height: min(860px, calc(100dvh - 2rem)); margin-top: 1rem; border-radius: 28px; overflow: hidden; border: 10px solid #1f2c34; } }
+    header { background: var(--verde); color: #fff; padding: .7rem 1rem; display: flex; align-items: center; gap: .7rem; }
+    header .avatar { width: 40px; height: 40px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 22px; }
+    header small { display: block; opacity: .85; font-size: .78rem; }
+    header button { margin-left: auto; background: none; border: 0; color: #fff; font-size: 1.1rem; cursor: pointer; }
+    .banda { background: #fff3c4; color: #5c4b00; font-size: .78rem; padding: .35rem .8rem; text-align: center; }
+    .banda.real { background: #ffd9d9; color: #7a0000; }
+    .chat { flex: 1; overflow-y: auto; padding: .8rem; display: flex; flex-direction: column; gap: .35rem;
+      background-image: radial-gradient(#0000000a 1px, transparent 1px); background-size: 18px 18px; }
+    .msg { max-width: 82%; padding: .45rem .6rem .25rem; border-radius: 8px; font-size: .93rem; line-height: 1.35; white-space: pre-wrap; word-wrap: break-word; box-shadow: 0 1px 0 #0001; }
+    .msg small { display: block; text-align: right; color: var(--gris); font-size: .68rem; margin-top: 2px; }
+    .cliente { align-self: flex-end; background: var(--mio); border-top-right-radius: 0; }
+    .negocio { align-self: flex-start; background: #fff; border-top-left-radius: 0; }
+    .sistema { align-self: center; background: #fff3c4; font-size: .8rem; }
+    .escribiendo { align-self: flex-start; background: #fff; color: var(--gris); font-style: italic; }
+    .pie { display: flex; gap: .4rem; padding: .5rem; align-items: center; }
+    .pie input[type=text] { flex: 1; border: 0; border-radius: 22px; padding: .7rem 1rem; font-size: 1rem; outline: none; }
+    .redondo { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--verde); color: #fff; font-size: 1.15rem; cursor: pointer; flex: none; display: grid; place-items: center; }
+    .redondo.gris { background: #fff; color: var(--gris); }
+    .redondo.rec { background: #e53935; animation: latido 1s infinite; }
+    @keyframes latido { 50% { transform: scale(1.12); } }
+    .redondo:disabled { opacity: .5; }
+    label.redondo input { display: none; }
+    .ejemplos { display: flex; gap: .4rem; overflow-x: auto; padding: 0 .5rem .2rem; }
+    .ejemplos button { flex: none; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid #0002; background: #fff; border-radius: 16px; padding: .35rem .7rem; font-size: .8rem; cursor: pointer; }
+    .perfil { padding: 1.2rem; display: grid; gap: .8rem; }
+    .perfil input { width: 100%; padding: .7rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+    .perfil button { padding: .8rem; border: 0; border-radius: 8px; background: var(--verde); color: #fff; font-size: 1rem; cursor: pointer; }
+    .perfil p { margin: 0; color: var(--gris); font-size: .9rem; }
+    .error { background: #e53935; color: #fff; padding: .5rem .8rem; font-size: .85rem; cursor: pointer; }
+  </style>
+  <script>
+    // Simulador de WhatsApp: hace de celular del cliente. Manda al webhook el MISMO JSON que manda Meta.
+    async function revisar(r) {
+      if (r.ok) return r
+      const { error } = await r.json().catch(() => ({}))
+      throw new Error(error || `El servidor respondió ${r.status}.`)
+    }
+    const leerLocal = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d } catch { return d } }
+    const guardarLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
+
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('wa', () => ({
+        estado: null, negocio: null, perfil: leerLocal('waPerfil', null),
+        nombre: '', telefono: '', mensajes: [], texto: '', enviando: false, grabando: false, error: '',
+        async init() {
+          try {
+            this.estado = await (await revisar(await fetch('/api/wa/estado'))).json()
+            const r = await fetch('/api/publico/negocio')
+            if (r.ok) this.negocio = await r.json()
+          } catch (e) { this.error = e.message }
+          const n = ['Marta', 'Lucas', 'Sofía', 'Julián', 'Carla', 'Ramiro'][Math.floor(Math.random() * 6)]
+          this.nombre = n
+          this.telefono = '54934155' + String(Math.floor(10000 + Math.random() * 89999))
+          if (this.perfil) this.cargar()
+          setInterval(() => this.perfil && this.cargar(), 2500)
+        },
+        entrar() {
+          this.perfil = { nombre: this.nombre.trim() || 'Cliente', telefono: this.telefono.replace(/\D/g, '') }
+          guardarLocal('waPerfil', this.perfil)
+          this.cargar()
+        },
+        salir() { this.perfil = null; this.mensajes = []; guardarLocal('waPerfil', null) },
+        async cargar() {
+          const r = await fetch('/api/wa-mock/chat?telefono=' + this.perfil.telefono)
+          if (!r.ok) return
+          const nuevos = await r.json()
+          const cambio = nuevos.length !== this.mensajes.length
+          this.mensajes = nuevos
+          if (cambio) this.$nextTick(() => { const c = this.$refs.chat; if (c) c.scrollTop = c.scrollHeight })
+        },
+        // El payload de la Cloud API de WhatsApp, tal cual.
+        payload(mensaje) {
+          return {
+            object: 'whatsapp_business_account',
+            entry: [{ id: 'MOCK', changes: [{ field: 'messages', value: {
+              messaging_product: 'whatsapp',
+              metadata: { display_phone_number: '5493410000000', phone_number_id: 'MOCK' },
+              contacts: [{ profile: { name: this.perfil.nombre }, wa_id: this.perfil.telefono }],
+              messages: [{ from: this.perfil.telefono, id: 'wamid.MOCK' + Date.now() + Math.random().toString(36).slice(2, 6),
+                timestamp: String(Math.floor(Date.now() / 1000)), ...mensaje }],
+            } }] }],
+          }
+        },
+        async mandar(mensaje, mostrar) {
+          this.enviando = true
+          this.error = ''
+          this.mensajes.push({ id: 'tmp', de: 'cliente', texto: mostrar, fecha: new Date().toISOString() })
+          this.$nextTick(() => { this.$refs.chat.scrollTop = this.$refs.chat.scrollHeight })
+          try {
+            await revisar(await fetch('/webhook/whatsapp', {
+              method: 'POST', headers: { 'content-type': 'application/json', 'x-mostrador-mock': '1' }, body: JSON.stringify(this.payload(mensaje)),
+            }))
+            await this.cargar()
+          } catch (e) { this.error = e.message } finally { this.enviando = false }
+        },
+        enviarTexto() {
+          const t = this.texto.trim()
+          if (!t) return
+          this.texto = ''
+          return this.mandar({ type: 'text', text: { body: t } }, t)
+        },
+        async subir(blob) {
+          const r = await revisar(await fetch('/api/wa-mock/media', { method: 'POST', headers: { 'content-type': blob.type || 'application/octet-stream' }, body: blob }))
+          return (await r.json()).id
+        },
+        async foto(e) {
+          const archivo = e.target.files[0]
+          e.target.value = ''
+          if (!archivo) return
+          try {
+            const img = await createImageBitmap(archivo)
+            const k = Math.min(1, 1280 / Math.max(img.width, img.height))
+            const cv = Object.assign(document.createElement('canvas'), { width: img.width * k, height: img.height * k })
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
+            const blob = await new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85))
+            const id = await this.subir(blob)
+            this.mandar({ type: 'image', image: { id, mime_type: 'image/jpeg', caption: this.texto.trim() || undefined } }, '📷 Foto')
+            this.texto = ''
+          } catch (err) { this.error = err.message }
+        },
+        async grabar() {
+          if (this.grabando) { this._rec.stop(); return }
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const partes = []
+            this._rec = new MediaRecorder(stream)
+            this._rec.ondataavailable = (ev) => partes.push(ev.data)
+            this._rec.onstop = async () => {
+              stream.getTracks().forEach((t) => t.stop())
+              this.grabando = false
+              const tipo = this._rec.mimeType || 'audio/webm'
+              try {
+                const id = await this.subir(new Blob(partes, { type: tipo }))
+                this.mandar({ type: 'audio', audio: { id, mime_type: tipo } }, '🎤 Audio')
+              } catch (err) { this.error = err.message }
+            }
+            this._rec.start()
+            this.grabando = true
+          } catch { this.error = 'No pude usar el micrófono (hace falta HTTPS y dar permiso).' }
+        },
+        hora: (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      }))
+    })
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+<div class="tel" x-data="wa" x-cloak>
+  <header>
+    <div class="avatar" x-text="estado?.emoji || '🏪'"></div>
+    <div>
+      <strong x-text="estado?.negocio || 'Negocio'"></strong>
+      <small x-text="enviando ? 'escribiendo…' : 'en línea'"></small>
+    </div>
+    <button x-show="perfil" @click="salir" title="Cambiar de cliente">👤</button>
+  </header>
+  <div class="banda" :class="{ real: estado?.modo === 'real' }"
+       x-text="estado?.modo === 'real' ? '⚠️ WhatsApp está en modo API real: el simulador está apagado. Escribile al número del negocio.' : '🧪 Simulador de WhatsApp (modo MOCK): sos el cliente. El negocio lo recibe por el mismo webhook que la API real.'"></div>
+  <p class="error" x-show="error" x-text="error" @click="error = ''"></p>
+
+  <template x-if="!perfil">
+    <div class="perfil">
+      <p>¿Quién le escribe al negocio? Inventá un cliente.</p>
+      <input x-model="nombre" placeholder="Tu nombre" aria-label="Nombre">
+      <input x-model="telefono" placeholder="Tu número" aria-label="Teléfono" inputmode="tel">
+      <button @click="entrar" :disabled="estado?.modo === 'real'">Abrir el chat con el negocio</button>
+    </div>
+  </template>
+
+  <template x-if="perfil">
+    <div class="chat" x-ref="chat">
+      <template x-for="(m, i) in mensajes" :key="m.id + '-' + i">
+        <div class="msg" :class="m.de"><span x-text="m.texto"></span><small x-text="hora(m.fecha) + (m.de === 'cliente' ? ' ✓✓' : '')"></small></div>
+      </template>
+      <div class="msg escribiendo" x-show="enviando">escribiendo…</div>
+    </div>
+  </template>
+
+  <template x-if="perfil">
+    <div>
+      <div class="ejemplos" x-show="negocio?.ejemplo && mensajes.length < 2">
+        <button @click="texto = negocio.ejemplo; enviarTexto()" x-text="'💡 ' + negocio?.ejemplo"></button>
+      </div>
+      <form class="pie" @submit.prevent="enviarTexto">
+        <label class="redondo gris" title="Mandar una foto">📷<input type="file" accept="image/*" @change="foto"></label>
+        <input type="text" x-model="texto" placeholder="Mensaje" aria-label="Mensaje" :disabled="grabando">
+        <button type="submit" class="redondo" x-show="texto.trim()" :disabled="enviando" aria-label="Enviar">➤</button>
+        <button type="button" class="redondo" :class="{ rec: grabando }" x-show="!texto.trim()" @click="grabar" aria-label="Grabar audio" x-text="grabando ? '⏹' : '🎤'"></button>
+      </form>
+    </div>
+  </template>
+</div>
+</body>
+</html>
