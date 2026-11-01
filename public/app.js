@@ -40,7 +40,20 @@ const COMO_USA_IA = `
   <div><b>5. Rescata ventas.</b> Si una venta se enfría, redacta el mensaje de seguimiento con lo que pidió y el total, listo para mandar por WhatsApp. Y te dice por cuáles ventas empezar el día.</div>
   <div><b>6. Nadie se olvida.</b> Cada venta abierta le avisa a su responsable cada X minutos (sonido + notificación) hasta que alguien la mueva, y si no, escala al administrador.</div>
 </div>
-<p><small>Modelo de OpenAI con salida estructurada (JSON Schema estricto) validada en el servidor con el mismo tipo. Las respuestas se guardan en caché: repetir una demo no gasta la key. La key vive solo en el servidor.</small></p>`
+<p><small>Modelo de OpenAI (gpt-4.1) con salida estructurada (JSON Schema estricto) validada en el servidor con el mismo tipo. Las respuestas se guardan en caché: repetir una demo no gasta la key. La key vive solo en el servidor.</small></p>
+
+<h3>🧪 Cómo probar WhatsApp sin un número real (modo MOCK)</h3>
+<p>Para usar WhatsApp de verdad hace falta un número de WhatsApp Business aprobado por Meta. Mientras tanto, Mostrador trae un <b>simulador</b>: un "celular" en el navegador que manda <b>exactamente el mismo mensaje que la API oficial de Meta</b>, al mismo webhook. La IA, el embudo y los avisos funcionan igual que en producción.</p>
+<div class="grid-ia">
+  <div><b>1. Abrí el simulador.</b> Tocá <b>🧪 WhatsApp</b> arriba a la derecha, o escaneá con tu celular el QR del simulador en <b>🏪 QR y catálogo</b>. También está en <a href="whatsapp.html" target="_blank" rel="noopener">/whatsapp.html</a>.</div>
+  <div><b>2. Inventá un cliente.</b> Poné un nombre y un número y tocá "Abrir el chat con el negocio". Cada número es un cliente distinto.</div>
+  <div><b>3. Escribile al negocio.</b> Por ejemplo: <i>"hola, tienen cemento? quiero 4 bolsas"</i>. Podés mandar texto, una foto (📷) o un audio (🎤). El bot contesta en segundos con tus precios.</div>
+  <div><b>4. Mirá el CRM.</b> La venta aparece sola en el <b>Embudo</b>, asignada a alguien del equipo, con un aviso. Abrila para ver la charla y el historial.</div>
+  <div><b>5. Confirmá el pedido.</b> Cuando el bot pida el "SÍ", respondé <i>"sí, confirmo"</i>: la venta pasa sola a <b>Confirmado · preparar</b> y le llega un aviso al responsable.</div>
+  <div><b>6. Respondé desde el CRM.</b> En el detalle de la venta tocá <b>✍️ Redactar respuesta</b> o <b>🚑 Rescatar venta</b> y después <b>💬 Enviar por WhatsApp (MOCK)</b>: el mensaje aparece en el simulador.</div>
+</div>
+<p><small><b>Tip para la demo:</b> abrí el CRM en la pantalla grande y el simulador en el celular de alguien del público, así ven cómo cada mensaje cae en vivo en el embudo.<br>
+<b>Pasar a producción:</b> en ⚙️ Configuración → Conexión de WhatsApp elegís <b>API real</b> y cargás el token y el Phone Number ID de WhatsApp Cloud API. En Meta, la URL del webhook es <code>/webhook/whatsapp</code> con el verify token que muestra la pantalla. El simulador se apaga solo en ese modo.</small></p>`
 
 // Ayuda de cada sección (el ícono ❓). `video` es el id del video en como-funciona.html.
 const AYUDA = {
