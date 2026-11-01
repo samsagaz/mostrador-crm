@@ -115,6 +115,10 @@
             <button @click="leer" :aria-busy="ocupado" :disabled="ocupado || !texto.trim()">🧠 Leer con IA</button>
             <button class="secondary" @click="usarEjemplo" :disabled="ocupado">Probar con un ejemplo</button>
           </div>
+          <button class="bot" @click="pasarAlBot" :aria-busy="guardando" :disabled="guardando || ocupado || !texto.trim()"
+            title="Escribí en pocas palabras qué pidió y su teléfono: el bot arma la venta y le escribe por WhatsApp para confirmarla">
+            🤖 Pasarle al bot <small>— le escribe al cliente por WhatsApp y confirma el pedido solo</small></button>
+          <p class="pista"><small>¿Te llamaron o vino al local? Anotá rápido, ej.: <i>"llamó Marta 341 555-2190, 3 bolsas de cemento, envío a Córdoba 1850"</i>, y tocá 🤖.</small></p>
           <div class="grid">
             <button class="outline" :class="{ grabando }" @click="grabar" :disabled="ocupado && !grabando" x-text="grabando ? '⏹️ Parar y leer' : '🎤 Grabar audio'"></button>
             <label class="archivo">📷 Foto <input type="file" accept="image/*" @change="subirFoto" :disabled="ocupado"></label>

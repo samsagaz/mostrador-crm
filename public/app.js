@@ -12,8 +12,8 @@ const RUBROS = [
 ]
 const ETAPAS = [
   { id: 'nuevo', nombre: 'Nuevo', icono: '🆕' },
-  { id: 'respondido', nombre: 'Respondido', icono: '💬' },
-  { id: 'confirmado', nombre: 'Confirmado', icono: '✅' },
+  { id: 'respondido', nombre: 'A confirmar', icono: '⏳' },
+  { id: 'confirmado', nombre: 'Confirmado · preparar', icono: '✅' },
   { id: 'entregado', nombre: 'Entregado', icono: '📦' },
   { id: 'perdido', nombre: 'Perdido', icono: '💔' },
 ]
@@ -231,6 +231,11 @@ document.addEventListener('alpine:init', () => {
       const antes = new Set(this.ops.map((o) => o.id))
       const [ops, tablero] = await Promise.all([api('/api/oportunidades'), api('/api/tablero')])
       if (silencioso) {
+        const previas = new Map(this.ops.map((o) => [o.id, o.etapa]))
+        for (const o of ops) if (o.confirmadoPorCliente && previas.get(o.id) && previas.get(o.id) !== 'confirmado' && o.etapa === 'confirmado') {
+          this.toast(`✅ ${o.cliente || 'Un cliente'} confirmó su pedido: ${this.pesos(o.total)}. ¡A preparar!`, 'ok', o.id)
+          sonar()
+        }
         for (const o of ops) if (antes.size && !antes.has(o.id) && ['web', 'whatsapp'].includes(o.canal) && Date.now() - new Date(o.creado) < 5 * 60_000) {
           this.toast(`${o.canal === 'web' ? '🌐 Nuevo pedido por el QR' : '🟢 Nuevo WhatsApp'}: ${o.cliente || 'cliente'} · ${o.resumen}`, 'ok', o.id)
           sonar()
@@ -306,6 +311,17 @@ document.addEventListener('alpine:init', () => {
     },
     recalcular() {
       this.ficha.total = this.ficha.items.reduce((s, it) => s + (it.precio == null ? 0 : it.precio * it.cantidad), 0)
+    },
+    // El empleado anota en dos palabras y el bot sigue: arma la venta y le escribe al cliente para confirmar.
+    pasarAlBot() {
+      return this.intentar('guardando', async () => {
+        const op = await enviarJSON('POST', '/api/bot/tomar', { texto: this.texto.trim(), canal: this.canal === 'whatsapp' ? 'telefono' : this.canal, quien: this.nombreYo() })
+        this.texto = ''
+        this.ficha = null
+        await this.refrescar()
+        this.toast(`🤖 El bot le escribió a ${op.cliente || 'el cliente'} por WhatsApp. Queda "a confirmar" hasta que diga que sí.`, 'ok')
+        this.abrir(op)
+      })
     },
     guardarFicha() {
       return this.intentar('guardando', async () => {

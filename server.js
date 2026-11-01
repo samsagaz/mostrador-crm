@@ -225,7 +225,7 @@ const camposLectura = {
 const Lectura = type(camposLectura)
 const formatoLectura = standardResponseFormat(Lectura, 'lectura')
 // La misma lectura, más la respuesta para el cliente (la página pública de pedidos).
-const Charla = type({ ...camposLectura, respuesta: 'string' })
+const Charla = type({ ...camposLectura, clienteConfirmo: 'boolean', respuesta: 'string' })
 const formatoCharla = standardResponseFormat(Charla, 'charla')
 
 const textoCatalogo = (n) => n.catalogo.map((p) => `- ${p.producto} (${p.unidad})${p.precio != null ? ` $${p.precio}` : ''}`).join('\n')
@@ -257,7 +257,9 @@ ${reglasLectura(n)}`
 const PROMPT_CHARLA = (n) => `Sos quien atiende el chat de pedidos de ${n.nombre}. Te paso la conversación con un cliente. Leé TODA la conversación, armá la ficha de la venta con lo último que se sabe y escribí la próxima respuesta.
 
 ${reglasLectura(n)}
-- respuesta: lo que le contestás al cliente ahora, en rioplatense, cálido y corto (2 a 5 líneas). Confirmá lo que entendiste. Si hay productos con precio en el catálogo, decí el precio unitario tal cual figura; si no tiene precio o no está en el catálogo, decí que el negocio le confirma el precio enseguida. Hacé como mucho 2 preguntas de faltaInfo por vez. Si ya tenés nombre, contacto (teléfono) y forma de entrega, decile que el pedido quedó registrado y que el negocio lo confirma. Nunca inventes precios, stock, horarios ni promociones.`
+- clienteConfirmo: true SOLO si en su último mensaje el cliente acepta explícitamente el pedido ya detallado (ej. "sí", "dale", "confirmo", "mandalo") y ya se sabe qué lleva y si retira o se envía. Si pregunta, duda, cambia algo o solo saluda: false.
+- respuesta: lo que le contestás al cliente ahora. Si falta algo para cerrar, pedilo; cuando ya está todo, resumí el pedido con el total y pedile que responda "SÍ" para confirmarlo. Si clienteConfirmo es true, agradecé y decile que el pedido quedó confirmado y ya lo empiezan a preparar.
+- Además, en la respuesta: rioplatense, cálido y corto (2 a 5 líneas). Confirmá lo que entendiste. Si hay productos con precio en el catálogo, decí el precio unitario tal cual figura; si no tiene precio o no está en el catálogo, decí que el negocio le confirma el precio enseguida. Hacé como mucho 2 preguntas de faltaInfo por vez. Nunca inventes precios, stock, horarios ni promociones.`
 
 // Le pone precio con el catálogo (no con la IA) y calcula el total.
 function conPrecios(lectura, negocio) {
@@ -466,7 +468,13 @@ const formatoRedaccion = standardResponseFormat(Redaccion, 'redaccion')
 
 const PROMPT_REDACCION = (n, modo) => `Sos quien atiende el WhatsApp de ${n.nombre} (${n.rubro}, ${n.ciudad}). Te paso en JSON una oportunidad de venta con los mensajes del cliente, los productos (con precio del catálogo o null) y las horas que pasaron sin respuesta.
 
-${modo === 'rescate'
+${modo === 'confirmar'
+    ? `Objetivo: el cliente hizo un pedido por teléfono o en el mostrador y ahora le escribís por WhatsApp para dejarlo confirmado por escrito.
+- Saludá por el nombre y decí que le escribís de ${n.nombre} por el pedido que hizo.
+- Detallá los productos con cantidades, precio unitario si lo hay y el total con formato $12.345 (si alguno no tiene precio, que se lo confirmás).
+- Si faltan datos (faltaInfo), preguntalos (como mucho 2).
+- Terminá pidiéndole que responda "SÍ" para confirmar el pedido y empezar a prepararlo.`
+    : modo === 'rescate'
     ? `Objetivo: RESCATAR esta venta que se está enfriando. El cliente escribió hace rato y puede estar comprándole a otro.
 - Abrí pidiendo disculpas breves por la demora si nadie le contestó, sin excusas largas.
 - Nombrá lo que pidió (los productos concretos) y, si hay total, el total con formato $12.345.
@@ -486,7 +494,7 @@ app.post('/api/oportunidades/:id/redactar', async (c) => {
   const op = leerOportunidad(Number(c.req.param('id')))
   if (!op) return c.json({ error: 'No existe esa oportunidad.' }, 404)
   const negocio = leerNegocio()
-  const modo = c.req.query('modo') === 'rescate' ? 'rescate' : 'respuesta'
+  const modo = ['rescate', 'confirmar'].includes(c.req.query('modo')) ? c.req.query('modo') : 'respuesta'
   const resumen = {
     cliente: op.cliente, tipo: op.tipo, entrega: op.entrega, direccion: op.direccion, faltaInfo: op.faltaInfo,
     items: op.items.map(({ producto, cantidad, unidad, nota, precio, subtotal }) => ({ producto, cantidad, unidad, nota, precio, subtotal })),
@@ -539,7 +547,7 @@ app.get('/api/publico/negocio', (c) => {
 // y escribe la respuesta. La venta queda "nueva" hasta que alguien del negocio la tome.
 async function atender({ negocio, op, canal, texto, imagen, telefono = null, nombre = null, origen }) {
   const mensajes = [...(op?.mensajes || []), { de: 'cliente', texto: texto || '[mandó una foto]', fecha: ahora() }]
-  const historia = mensajes.slice(-12).map((m) => ({ role: m.de === 'cliente' ? 'user' : 'assistant', content: m.texto }))
+  const historia = mensajes.filter((m) => m.de !== 'nota').slice(-12).map((m) => ({ role: m.de === 'cliente' ? 'user' : 'assistant', content: m.texto }))
   if (imagen) {
     historia[historia.length - 1] = { role: 'user', content: [
       { type: 'text', text: texto || 'Te mando una foto de lo que necesito:' },
@@ -548,14 +556,29 @@ async function atender({ negocio, op, canal, texto, imagen, telefono = null, nom
   }
   const extra = telefono ? `\nEl cliente escribe desde WhatsApp: su teléfono es ${telefono}${nombre ? ` y su nombre de perfil es "${nombre}"` : ''}. Usalos en la ficha y no se los pidas.` : ''
   const r = await pedirJSON(formatoCharla, [{ role: 'system', content: PROMPT_CHARLA(negocio) + extra }, ...historia])
-  const { respuesta, ...lectura } = r
+  const { respuesta, clienteConfirmo, ...lectura } = r
   mensajes.push({ de: 'negocio', texto: respuesta, fecha: ahora(), ia: true })
-  const nueva = { ...(op || {}), ...conPrecios(lectura, negocio), canal, mensajes }
+  const nueva = { ...(op || {}), ...conPrecios(lectura, negocio), canal: op?.canal || canal, mensajes }
   if (telefono) nueva.telefono = telefono
   if (!nueva.cliente && nombre) nueva.cliente = nombre
   if (!op) nacer(nueva, negocio, origen)
   nueva.ultimaActividad = op?.ultimaActividad || ahora()
+  // El cliente dijo que sí: la venta pasa sola a "confirmado" (recién ahí se prepara) y se le avisa al responsable.
+  if (clienteConfirmo && nueva.items.length && ['nuevo', 'respondido'].includes(nueva.etapa)) {
+    const t = ahora()
+    nueva.historial = [...(nueva.historial || []), { etapa: 'confirmado', fecha: t }]
+    if (!nueva.primeraRespuesta) nueva.primeraRespuesta = t
+    evento(nueva, `✅ El cliente confirmó el pedido por ${origen}: ${pesos(nueva.total)}. A preparar.`)
+    nueva.etapa = 'confirmado'
+    nueva.ultimaActividad = t
+    nueva.proximoAviso = null
+    nueva.confirmadoPorCliente = t
+  }
   const id = lectura.tipo === 'no_es_venta' && !op ? null : guardarOportunidad(nueva)
+  if (id && nueva.confirmadoPorCliente && !op?.confirmadoPorCliente) {
+    const destino = new Set([nueva.asignado, ...negocio.usuarios.filter((u) => u.rol === 'admin').map((u) => u.id)].filter(Boolean))
+    for (const u of destino) insertarAviso.run(ahora(), u, id, `✅ ${nueva.cliente || 'Un cliente'} confirmó su pedido · ${pesos(nueva.total)} · a preparar`)
+  }
   return { id, respuesta, nueva, lectura }
 }
 
@@ -581,6 +604,15 @@ const GRAPH = 'https://graph.facebook.com/v21.0'
 const mediaMock = new Map()   // id → { buffer, mime } (lo que el simulador "sube")
 const registrarWa = db.prepare('INSERT OR IGNORE INTO wa_mensajes (fecha, telefono, de, texto, waid) VALUES (?, ?, ?, ?, ?)')
 const soloDigitos = (t) => String(t || '').replace(/\D/g, '')
+// Número internacional de WhatsApp: 341 555-2190 → 5493415552190 (así lo usa la Cloud API).
+function telInt(t) {
+  let d = soloDigitos(t)
+  if (d.startsWith('00')) d = d.slice(2)
+  if (d.startsWith('0')) d = d.slice(1)
+  if (d.length === 10) d = '549' + d
+  else if (d.length === 12 && d.startsWith('54') && d[2] !== '9') d = '549' + d.slice(2)
+  return d
+}
 
 function configWa(negocio) {
   const wa = negocio?.whatsapp || { modo: 'mock', autoResponder: true }
@@ -590,7 +622,7 @@ function configWa(negocio) {
 // Manda un texto por WhatsApp. En MOCK queda en la bandeja del simulador; en real va por la Cloud API.
 async function enviarWhatsapp(negocio, telefono, texto) {
   const wa = configWa(negocio)
-  const tel = soloDigitos(telefono)
+  const tel = telInt(telefono)
   if (!tel) throw new Error('Esta venta no tiene teléfono para mandarle un WhatsApp.')
   if (wa.modo === 'real') {
     const r = await fetch(`${GRAPH}/${wa.phoneNumberId}/messages`, {
@@ -620,7 +652,7 @@ async function transcribir(buffer, ext) {
 
 // Un mensaje entrante de WhatsApp (ya sacado del JSON de Meta).
 async function recibirWhatsapp(negocio, m, contacto) {
-  const tel = soloDigitos(m.from)
+  const tel = telInt(m.from)
   let texto = null, imagen = null
   if (m.type === 'text') texto = m.text?.body
   else if (m.type === 'audio') {
@@ -637,9 +669,11 @@ async function recibirWhatsapp(negocio, m, contacto) {
   if (!nuevo) return
 
   // La venta abierta de este teléfono, o una nueva.
-  const op = listarOportunidades().find((o) => soloDigitos(o.telefono) === tel && ABIERTAS.includes(o.etapa) && o.canal === 'whatsapp') || null
+  // La venta abierta de este teléfono (venga de WhatsApp, de una llamada pasada al bot, etc.).
+  const mismoTel = (o) => { const d = soloDigitos(o.telefono); return d && (d === tel || d.slice(-10) === tel.slice(-10)) }
+  const op = listarOportunidades().find((o) => mismoTel(o) && ['nuevo', 'respondido'].includes(o.etapa)) || null
   const wa = configWa(negocio)
-  if (!wa.autoResponder) {
+  if (!wa.autoResponder && !op?.bot) {
     // Sin respuesta automática: la IA igual arma la ficha, pero contesta una persona.
     const lectura = conPrecios(await pedirJSON(formatoLectura, [
       { role: 'system', content: PROMPT_LECTURA(negocio) },
@@ -683,7 +717,7 @@ app.post('/webhook/whatsapp', async (c) => {
       const contacto = (v.contacts || []).find((x) => x.wa_id === m.from) || v.contacts?.[0]
       tareas.push(recibirWhatsapp(negocio, m, contacto).catch((err) => {
         console.error('whatsapp:', err)
-        registrarWa.run(ahora(), soloDigitos(m.from), 'sistema', '⚠️ ' + (err instanceof OpenAI.RateLimitError ? 'La IA está saturada, te contestamos enseguida.' : 'No pudimos procesar el mensaje, te contestamos enseguida.'), null)
+        registrarWa.run(ahora(), telInt(m.from), 'sistema', '⚠️ ' + (err instanceof OpenAI.RateLimitError ? 'La IA está saturada, te contestamos enseguida.' : 'No pudimos procesar el mensaje, te contestamos enseguida.'), null)
       }))
     }
   }
@@ -701,7 +735,7 @@ app.post('/api/wa-mock/media', async (c) => {
   return c.json({ id })
 })
 app.get('/api/wa-mock/chat', (c) => {
-  const tel = soloDigitos(c.req.query('telefono'))
+  const tel = telInt(c.req.query('telefono'))
   return c.json(db.prepare('SELECT id, fecha, de, texto FROM wa_mensajes WHERE telefono = ? ORDER BY id').all(tel))
 })
 app.get('/api/wa/estado', (c) => {
@@ -718,6 +752,51 @@ app.post('/api/oportunidades/:id/enviar', async (c) => {
   if (!mensaje?.trim()) return c.json({ error: 'El mensaje está vacío.' }, 400)
   await enviarWhatsapp(leerNegocio(), op.telefono, mensaje.trim())
   return c.json({ ok: true, modo: configWa(leerNegocio()).modo })
+})
+
+// ---------------------------------------------------------------------------
+// 6c. "Pasarle al bot": el empleado anota en dos palabras lo que le pidieron (por teléfono, en el mostrador)
+//     y la IA arma la venta, le escribe al cliente por WhatsApp para confirmarla y sigue la charla sola.
+// ---------------------------------------------------------------------------
+const PasarAlBot = type({ texto: '0 < string <= 2000', canal: 'string', 'quien?': 'string <= 60' })
+
+app.post('/api/bot/tomar', async (c) => {
+  const negocio = leerNegocio()
+  if (!negocio) return c.json({ error: 'Primero creá el negocio.' }, 400)
+  const body = PasarAlBot(await c.req.json())
+  if (body instanceof type.errors) return c.json({ error: 'Escribí en pocas palabras qué pidió y el teléfono del cliente.' }, 400)
+  const lectura = conPrecios(await pedirJSON(formatoLectura, [
+    { role: 'system', content: PROMPT_LECTURA(negocio) + '\n\nOjo: el texto es una nota rápida que escribió un empleado (no el cliente), con lo que el cliente pidió por teléfono o en el local.' },
+    { role: 'user', content: body.texto },
+  ]), negocio)
+  if (lectura.tipo === 'no_es_venta' || !lectura.items.length) return c.json({ error: `No encontré un pedido en la nota: ${lectura.analisis}` }, 422)
+  if (!soloDigitos(lectura.telefono)) return c.json({ error: 'Para que el bot le escriba, la nota tiene que tener el teléfono del cliente.', ficha: lectura }, 422)
+
+  const op = { ...lectura, canal: CANALES.includes(body.canal) ? body.canal : 'telefono', ultimaActividad: ahora(), bot: true,
+    mensajes: [{ de: 'nota', texto: `📝 ${body.quien || 'Empleado'}: ${body.texto}`, fecha: ahora() }] }
+  nacer(op, negocio, `${op.canal} (pasada al bot por ${body.quien || 'un empleado'})`)
+  const id = guardarOportunidad(op)
+
+  const guardada = leerOportunidad(id)
+  const resumen = {
+    cliente: guardada.cliente, tipo: guardada.tipo, entrega: guardada.entrega, direccion: guardada.direccion, faltaInfo: guardada.faltaInfo,
+    items: guardada.items.map(({ producto, cantidad, unidad, nota, precio, subtotal }) => ({ producto, cantidad, unidad, nota, precio, subtotal })),
+    total: guardada.total || null,
+  }
+  const { mensaje } = await pedirJSON(formatoRedaccion, [
+    { role: 'system', content: PROMPT_REDACCION(negocio, 'confirmar') },
+    { role: 'user', content: JSON.stringify(resumen) },
+  ])
+  await enviarWhatsapp(negocio, guardada.telefono, mensaje)
+  const t = ahora()
+  guardada.mensajes = [...guardada.mensajes, { de: 'negocio', texto: mensaje, fecha: t, ia: true }]
+  guardada.historial = [...guardada.historial, { etapa: 'respondido', fecha: t }]
+  guardada.primeraRespuesta = t
+  guardada.etapa = 'respondido'
+  guardada.ultimaActividad = t
+  evento(guardada, '🤖 El bot le escribió por WhatsApp para confirmar el pedido.')
+  guardarOportunidad(guardada)
+  return c.json(leerOportunidad(id), 201)
 })
 
 // ---------------------------------------------------------------------------
@@ -797,7 +876,8 @@ app.post('/api/prioridades', async (c) => {
     { role: 'user', content: JSON.stringify(datos) },
   ])
   const ids = new Set(abiertas.map((o) => o.id))
-  return c.json({ ...r, prioridades: r.prioridades.filter((p) => ids.has(p.id)).slice(0, 3) })
+  const vistos = new Set()
+  return c.json({ ...r, prioridades: r.prioridades.filter((p) => ids.has(p.id) && !vistos.has(p.id) && vistos.add(p.id)).slice(0, 3) })
 })
 
 // ---------------------------------------------------------------------------
