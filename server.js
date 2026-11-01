@@ -98,7 +98,7 @@ const Rubro = type({
   analisis: 'string',
   botNombre: 'string',
   botPersonalidad: 'string',
-  catalogo: type({ precio: 'number | null', producto: 'string', unidad: 'string' }).array(),
+  catalogo: type({ precio: 'number | null', precioSugerido: 'number', producto: 'string', unidad: 'string' }).array(),
   color: 'string',
   datosParaCerrar: 'string[]',
   ejemplos: 'string[]',
@@ -116,7 +116,8 @@ const PROMPT_RUBRO = `Sos consultor de ventas de comercios de barrio en Argentin
 - analisis: dos frases: cómo compran los clientes de este rubro y dónde se le escapan las ventas.
 - botNombre: un nombre corto, simpático y del rubro para el asistente que atiende el WhatsApp (ej. ferretería: "Tuerca"; rotisería: "Rosita"; veterinaria: "Firulais"; taller: "Pistón"). Sin la palabra "bot".
 - botPersonalidad: 2 o 3 frases que describen cómo habla el asistente: tono, la jerga y las palabras típicas de ESTE rubro que usa con naturalidad (ej. ferretería: habla de medidas, "te lo separo", "pasá a retirar por el mostrador"; veterinaria: pregunta por la mascota por su nombre, habla de "turno" y "consulta"). Rioplatense.
-- catalogo: si te pasan una lista de precios, copiá SOLO esos productos con su precio tal cual (números, sin $ ni puntos de miles). Si no te pasan lista, proponé entre 12 y 16 productos o servicios típicos del rubro con precio null: los precios los carga el dueño, no los inventes. unidad: "u", "kg", "m", "hora", "caja", "turno", etc.
+- catalogo: si te pasan una lista de precios, copiá SOLO esos productos con su precio tal cual (números, sin $ ni puntos de miles). Si no te pasan lista, proponé entre 12 y 16 productos o servicios típicos del rubro con precio null. unidad: "u", "kg", "m", "hora", "caja", "turno", etc.
+- precioSugerido: para cada producto, un precio de referencia aproximado en pesos argentinos de hoy (número entero), para arrancar la demo; el dueño lo revisa. Si te pasaron la lista, repetí el precio de la lista.
 - color: un color hexadecimal (#rrggbb) que represente al rubro y se lea bien con texto blanco encima (oscuro o medio, nunca pastel).
 - datosParaCerrar: de 3 a 5 datos que el negocio necesita para cerrar una venta en este rubro (ej. ferretería: medidas, cantidad, retiro o envío; veterinaria: especie y peso del animal).
 - ejemplos: 3 mensajes de WhatsApp realistas de clientes de este rubro, en rioplatense, como los escribe la gente (sin tildes, abreviado). El primero un pedido claro con nombre y dirección, el segundo ambiguo (falta cantidad o medida), el tercero una consulta de precio y disponibilidad.
@@ -170,7 +171,10 @@ async function armarRubro(body) {
     rubro: body.rubro.trim(),
     ciudad: body.ciudad?.trim() || 'Rosario',
     analisis: r.analisis,
-    catalogo: r.catalogo.slice(0, 40).map((p) => ({ ...p, precio: p.precio == null ? null : Math.max(0, p.precio) })),
+    // Sin lista de precios: se usa el precio sugerido por la IA, marcado como "sugerido" para que el dueño lo revise.
+    catalogo: r.catalogo.slice(0, 40).map(({ precioSugerido, ...p }) => p.precio != null
+      ? { ...p, precio: Math.max(0, p.precio) }
+      : { ...p, precio: precioSugerido > 0 ? Math.round(precioSugerido) : null, sugerido: precioSugerido > 0 }),
     datosParaCerrar: r.datosParaCerrar.slice(0, 6),
     ejemplos: r.ejemplos.slice(0, 3),
     emoji,
@@ -258,7 +262,7 @@ const EdicionNegocio = type({
     token: 'string | null', phoneNumberId: 'string | null', verifyToken: 'string <= 100', appSecret: 'string | null',
   },
   usuarios: type({ id: 'number', nombre: '0 < string <= 60', rol: "'admin' | 'vendedor'", telefono: 'string | null' }).array().atLeastLength(1).atMostLength(20),
-  catalogo: type({ producto: '0 < string <= 120', unidad: 'string <= 20', precio: 'number | null' }).array().atMostLength(80),
+  catalogo: type({ producto: '0 < string <= 120', unidad: 'string <= 20', precio: 'number | null', 'sugerido?': 'boolean' }).array().atMostLength(80),
 })
 
 app.put('/api/negocio', async (c) => {
@@ -1081,6 +1085,11 @@ function cargarEjemplos(negocio) {
       resumen: items.map((it) => `${it.cantidad} ${it.producto}`).join(' + ').slice(0, 60),
       tipo: i % 4 === 3 ? 'presupuesto' : 'pedido', urgencia: i < 3 ? 'alta' : 'media',
     }, negocio)
+    // Venta de demo con un producto sin precio: se le pone un precio de demo para que el tablero muestre plata real.
+    op.items = op.items.map((it, k) => it.precio != null ? it : { ...it, precio: [2500, 4800, 7200, 9900, 15000, 22000][(i + k) % 6], subtotal: null })
+      .map((it) => ({ ...it, subtotal: Math.round(it.precio * it.cantidad) }))
+    op.total = op.items.reduce((t, it) => t + it.subtotal, 0)
+    op.sinPrecio = 0
     Object.assign(op, {
       canal, etapa, historial, primeraRespuesta, ultimaActividad: ultima, motivoPerdida: motivo || null, ejemplo: true,
       asignado: negocio.usuarios[i % negocio.usuarios.length].id, avisosDados: 0,

@@ -372,7 +372,8 @@
                 <tr>
                   <td><input x-model="p.producto" aria-label="Producto"></td>
                   <td><input x-model="p.unidad" class="corto" aria-label="Unidad"></td>
-                  <td><input type="number" min="0" x-model.number="p.precio" placeholder="sin precio" aria-label="Precio"></td>
+                  <td><input type="number" min="0" x-model.number="p.precio" @input="p.sugerido = false" placeholder="sin precio" aria-label="Precio">
+                    <small class="sugerido" x-show="p.sugerido">sugerido por IA, revisalo</small></td>
                   <td><button class="mini outline secondary" @click="config.catalogo.splice(i, 1)" aria-label="Quitar">✕</button></td>
                 </tr>
               </template>

@@ -179,3 +179,5 @@ input[type=color] { height: 2.8rem; padding: .2rem; }
 .ayuda-caja { max-width: 560px; }
 .ayuda-caja ol { padding-left: 1.2rem; } .ayuda-caja li { margin-bottom: .4rem; }
 .ayuda-caja footer { display: flex; gap: .5rem; } .ayuda-caja footer > * { margin: 0; }
+
+.sugerido { display: block; color: var(--naranja); font-size: .72rem; }
