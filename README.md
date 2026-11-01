@@ -3,7 +3,7 @@
 **Hackatón DonWeb Day Rosario, 1/11/2026.** Desafío: un negocio local pierde ventas porque atiende consultas y
 pedidos a mano, por WhatsApp o por teléfono.
 
-**Demo:** `http://201.32.132.183` · **Simulador de WhatsApp:** `http://201.32.132.183/whatsapp.html` · **Pedidos por QR:** `http://201.32.132.183/pedir.html` · **🎬 Videos paso a paso:** `http://201.32.132.183/como-funciona.html`
+**Demo:** `https://dwday-1252426.online` · **Simulador de WhatsApp:** `https://dwday-1252426.online/whatsapp.html` · **Pedidos por QR:** `https://dwday-1252426.online/pedir.html` · **🎬 Videos paso a paso:** `https://dwday-1252426.online/como-funciona.html`
 
 ## El problema, de raíz
 
@@ -49,7 +49,7 @@ En **⚙️ Configuración → Conexión de WhatsApp**:
 
 - **MOCK (demo):** abrí `/whatsapp.html` (o escaneá el QR en "QR y catálogo") y escribile al negocio como cliente.
 - **API real (WhatsApp Cloud API):** cargá el token, el Phone Number ID y, opcional, el App Secret (con él se valida la
-  firma `X-Hub-Signature-256`). En Meta for Developers, la URL de callback es `http://201.32.132.183/webhook/whatsapp`, con el
+  firma `X-Hub-Signature-256`). En Meta for Developers, la URL de callback es `https://dwday-1252426.online/webhook/whatsapp`, con el
   verify token que muestra la pantalla, suscripto a `messages`. Los mensajes repetidos (mismo `wamid`) se atienden una sola vez.
 
 ## Videos tutoriales
