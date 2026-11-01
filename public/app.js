@@ -34,7 +34,7 @@ const COMO_USA_IA = `
 <p><a href="como-funciona.html" target="_blank" rel="noopener">▶️ Ver el video y el flujo completo, paso a paso</a></p>
 <div class="grid-ia">
   <div><b>1. Se adapta a tu rubro.</b> Le decís "ferretería" o "rotisería" y arma el catálogo (con tu lista de precios, en texto o foto), los datos que hay que pedirle a cada cliente y cuántas horas aguanta un cliente de ese rubro antes de comprarle a otro.</div>
-  <div><b>2. Lee cualquier mensaje.</b> Texto de WhatsApp, la nota de una llamada, la foto de una lista escrita a mano o un audio (Whisper lo pasa a texto). Devuelve una ficha <b>estructurada y validada</b> con ArkType: cliente, productos, tipo, urgencia, probabilidad de compra y próxima acción.</div>
+  <div><b>2. Lee cualquier mensaje.</b> Texto de WhatsApp, la nota de una llamada, una captura de un chat de Instagram, la foto de una lista escrita a mano o un audio (Whisper lo pasa a texto). Devuelve una ficha <b>estructurada y validada</b> con ArkType: cliente, productos, tipo, urgencia, probabilidad de compra y próxima acción.</div>
   <div><b>3. No inventa.</b> Los precios salen de <i>tu</i> catálogo, no de la IA. Si falta un dato, lo deja vacío y escribe la pregunta para hacerle al cliente. Si el mensaje no tiene que ver con el negocio, lo marca como "no es venta".</div>
   <div><b>4. Atiende 24/7 por el QR.</b> El cliente escribe en tu página de pedidos, la IA le contesta con tus precios y la venta cae sola en el embudo, asignada a alguien del equipo.</div>
   <div><b>5. Rescata ventas.</b> Si una venta se enfría, redacta el mensaje de seguimiento con lo que pidió y el total, listo para mandar por WhatsApp. Y te dice por cuáles ventas empezar el día.</div>
@@ -313,14 +313,30 @@ document.addEventListener('alpine:init', () => {
         this.ficha.mensajeOriginal = this.texto.trim()
       })
     },
-    subirFoto(e) {
+    subirFoto(e, origen = 'foto') {
       const archivo = e.target.files[0]
       e.target.value = ''
-      if (!archivo) return
+      if (archivo) return this.leerImagen(archivo, origen)
+    },
+    // Foto de una lista, o captura de un chat de Instagram/WhatsApp: la IA la lee y arma la ficha.
+    leerImagen(archivo, origen) {
+      if (origen === 'captura_instagram') this.canal = 'instagram'
+      if (origen === 'captura_whatsapp') this.canal = 'whatsapp'
       return this.intentar('ocupado', async () => {
-        this.ficha = await enviarJSON('POST', '/api/leer', { imagen: await achicarImagen(archivo) })
-        this.ficha.mensajeOriginal = '[foto de la lista]'
+        // Las capturas de chat tienen letra chica: se mandan más grandes.
+        const imagen = await achicarImagen(archivo, origen === 'foto' ? 1280 : 1800)
+        this.ficha = await enviarJSON('POST', '/api/leer', { imagen, origen })
+        this.ficha.mensajeOriginal = { foto: '📷 [foto de la lista]', captura_instagram: '📸 [captura de Instagram] ', captura_whatsapp: '🟢 [captura de WhatsApp] ' }[origen]
+          + (origen === 'foto' ? '' : this.ficha.analisis)
+        this.toast(origen === 'captura_instagram' ? '📸 Captura de Instagram leída: revisá la ficha y mandala al embudo.' : '📷 Imagen leída.', 'ok')
       })
+    },
+    // Ctrl+V de una imagen en el cuadro de texto: se lee como captura del canal elegido.
+    pegar(e) {
+      const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'))
+      if (!item) return
+      e.preventDefault()
+      return this.leerImagen(item.getAsFile(), this.canal === 'instagram' ? 'captura_instagram' : this.canal === 'whatsapp' ? 'captura_whatsapp' : 'foto')
     },
     async transcribirYLeer(cuerpo, ext) {
       const { texto } = await api('/api/audio', { method: 'POST', headers: { 'x-extension': ext }, body: cuerpo })

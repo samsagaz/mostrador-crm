@@ -23,7 +23,7 @@ Mostrador ataca las tres cosas.
 | 💬 **WhatsApp conectado (MOCK o API real)** | Los mensajes entran por un webhook de WhatsApp Cloud API. En **modo MOCK** (la demo), un simulador de celular manda **el mismo JSON que manda Meta**, así el código que corre es el mismo que en producción. Se cambia desde ⚙️ Configuración. |
 | 🤖 **La IA atiende y confirma** | Contesta con **tus** precios, pide lo que falta (medidas, dirección, retiro o envío) y cuando el cliente responde "sí", la venta pasa sola a **Confirmado · a preparar** y se le avisa al responsable. Un pedido no se prepara si no está confirmado. |
 | 📝 **Pasarle al bot** | ¿Te llamaron o vino al local? El empleado anota en dos palabras ("llamó Marta 341 555-2190, 3 bolsas de cemento, envío") y el bot arma la venta, le escribe al cliente por WhatsApp para confirmarla y sigue la charla solo. |
-| 📥 **Bandeja universal** | Pegá un mensaje, subí la foto de una lista escrita a mano o un audio (Whisper). La IA arma la ficha: cliente, productos, total, tipo, urgencia, probabilidad de compra, qué falta preguntar y la próxima acción. |
+| 📥 **Bandeja universal** | Pegá un mensaje, subí la foto de una lista escrita a mano, una **captura de Instagram o WhatsApp** (también con Ctrl+V) o un audio (Whisper). En las capturas, la IA separa los mensajes del cliente de los del negocio y toma el @usuario como cliente. La IA arma la ficha: cliente, productos, total, tipo, urgencia, probabilidad de compra, qué falta preguntar y la próxima acción. |
 | 🗂️ **Embudo de ventas** | Nuevo → A confirmar → Confirmado · preparar → Entregado / Perdido (con motivo). Las que se enfrían se ponen en rojo. Arrastrar y soltar. |
 | 🔔 **Nadie se olvida** | Cada venta tiene un responsable (se reparten entre el equipo). Mientras no se mueva, le avisa **cada X minutos** (configurable) con sonido y notificación del navegador. Si después de N avisos nadie la movió, **escala al administrador**. "Recordarme en 1 h / mañana". |
 | 🚑 **Rescatar venta** | Para una venta que se enfría, la IA escribe el mensaje de seguimiento con lo que pidió y el total, listo para mandar por WhatsApp. |
@@ -39,7 +39,7 @@ Mostrador ataca las tres cosas.
 - **No inventa.** Los precios los pone el sistema con el catálogo del negocio, no la IA. Si falta un dato: `null` y la
   pregunta en `faltaInfo`. Un mensaje que no tiene que ver con el negocio sale como `no_es_venta` y no ensucia el embudo.
 - **Confirmación explícita:** `clienteConfirmo` es `true` solo si el cliente acepta un pedido ya detallado.
-- **Entrada multimodal:** texto, foto (lista a mano, captura) y audio (Whisper, incluidos los `.opus` de WhatsApp).
+- **Entrada multimodal:** texto, foto de una lista a mano, captura de un chat de Instagram o WhatsApp (con instrucciones propias para cada una) y audio (Whisper, incluidos los `.opus` de WhatsApp).
 - **Caché en SQLite:** repetir la demo no gasta la key. La key vive solo en el servidor.
 - **Errores que llegan a la persona:** IA saturada (429), sin crédito, validación fallida: mensajes claros, nunca una pantalla rota.
 

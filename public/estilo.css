@@ -168,3 +168,7 @@ button.bot small { opacity: .85; font-weight: 400; }
 input[type=color] { height: 2.8rem; padding: .2rem; }
 .logo-alta { font-size: 3rem; }
 .kpi.ok strong { color: var(--verde); }
+
+.archivo.insta { border: 0; color: #fff; background: linear-gradient(45deg, #f09433, #dc2743 50%, #bc1888); }
+.entradas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .5rem; }
+.entradas > * { margin: 0 !important; }

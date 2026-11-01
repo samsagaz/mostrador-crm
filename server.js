@@ -338,7 +338,22 @@ function conPrecios(lectura, negocio) {
   return { ...lectura, items, total, sinPrecio: items.filter((it) => it.precio == null).length, probabilidad: limitar(lectura.probabilidad, 0, 100) }
 }
 
-const Entrada = type({ 'texto?': '0 < string <= 4000', 'imagen?': /^data:image\// })
+const Entrada = type({ 'texto?': '0 < string <= 4000', 'imagen?': /^data:image\//, 'origen?': "'foto' | 'captura_instagram' | 'captura_whatsapp'" })
+
+// Qué le decimos a la IA según de dónde viene la imagen.
+const INSTRUCCION_IMAGEN = {
+  foto: 'Foto que mandó el cliente (una lista escrita a mano, un pedido o un producto):',
+  captura_instagram: `Captura de pantalla de una conversación de Instagram (mensajes directos o comentarios) entre un cliente y el negocio.
+- Los mensajes del CLIENTE suelen estar a la izquierda (burbujas grises); los del negocio, a la derecha (de color). Armá la ficha con lo que pide el cliente; lo que ya contestó el negocio sirve de contexto.
+- cliente: el nombre o el @usuario que se ve arriba del chat o junto al comentario (con @ si es un usuario).
+- telefono: solo si el cliente lo escribió en el chat; si no, null y pedilo en faltaInfo (hace falta para seguir por WhatsApp).
+- En analisis, resumí en una frase lo que se habló en la captura.
+- Si la captura no es una conversación con un cliente (una publicación suelta, una historia sin mensajes), explicalo en analisis.`,
+  captura_whatsapp: `Captura de pantalla de una conversación de WhatsApp entre un cliente y el negocio.
+- Los mensajes del CLIENTE están a la izquierda (burbujas blancas); los del negocio, a la derecha (verdes). Armá la ficha con lo que pide el cliente.
+- cliente: el nombre que se ve arriba del chat. telefono: el número si se ve arriba o en el chat; si no, null.
+- En analisis, resumí en una frase lo que se habló en la captura.`,
+}
 
 app.post('/api/leer', async (c) => {
   const negocio = leerNegocio()
@@ -347,7 +362,7 @@ app.post('/api/leer', async (c) => {
   if (body instanceof type.errors) return c.json({ error: 'El mensaje es muy largo o la imagen no es válida.' }, 400)
   if (!body.texto && !body.imagen) return c.json({ error: 'Pegá un mensaje, subí una foto o grabá un audio.' }, 400)
   const contenido = body.imagen
-    ? [{ type: 'text', text: 'Foto que mandó el cliente (lista, captura de chat o pedido):' }, { type: 'image_url', image_url: { url: body.imagen } }]
+    ? [{ type: 'text', text: INSTRUCCION_IMAGEN[body.origen || 'foto'] }, { type: 'image_url', image_url: { url: body.imagen, detail: body.origen?.startsWith('captura') ? 'high' : 'auto' } }]
     : body.texto
   const lectura = await pedirJSON(formatoLectura, [
     { role: 'system', content: PROMPT_LECTURA(negocio) },

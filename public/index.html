@@ -111,7 +111,7 @@
               <label class="radio"><input type="radio" name="canal" :value="c" x-model="canal"> <span x-text="ICONO_CANAL[c] + ' ' + c"></span></label>
             </template>
           </div>
-          <textarea x-model="texto" rows="5" placeholder="Ej.: hola, soy Marta de Córdoba 1850, necesito 3 bolsas de cemento…" aria-label="Mensaje del cliente"></textarea>
+          <textarea x-model="texto" rows="5" @paste="pegar" placeholder="Ej.: hola, soy Marta de Córdoba 1850, necesito 3 bolsas de cemento…  (también podés pegar una captura con Ctrl+V)" aria-label="Mensaje del cliente"></textarea>
           <div role="group">
             <button @click="leer" :aria-busy="ocupado" :disabled="ocupado || !texto.trim()">🧠 Leer con IA</button>
             <button class="secondary" @click="usarEjemplo" :disabled="ocupado">Probar con un ejemplo</button>
@@ -120,9 +120,11 @@
             title="Escribí en pocas palabras qué pidió y su teléfono: el bot arma la venta y le escribe por WhatsApp para confirmarla">
             🤖 Pasarle al bot <small>— le escribe al cliente por WhatsApp y confirma el pedido solo</small></button>
           <p class="pista"><small>¿Te llamaron o vino al local? Anotá rápido, ej.: <i>"llamó Marta 341 555-2190, 3 bolsas de cemento, envío a Córdoba 1850"</i>, y tocá 🤖.</small></p>
-          <div class="grid">
+          <div class="entradas">
             <button class="outline" :class="{ grabando }" @click="grabar" :disabled="ocupado && !grabando" x-text="grabando ? '⏹️ Parar y leer' : '🎤 Grabar audio'"></button>
-            <label class="archivo">📷 Foto <input type="file" accept="image/*" @change="subirFoto" :disabled="ocupado"></label>
+            <label class="archivo">📷 Foto de lista <input type="file" accept="image/*" @change="subirFoto($event, 'foto')" :disabled="ocupado"></label>
+            <label class="archivo insta">📸 Captura de Instagram <input type="file" accept="image/*" @change="subirFoto($event, 'captura_instagram')" :disabled="ocupado"></label>
+            <label class="archivo">🟢 Captura de WhatsApp <input type="file" accept="image/*" @change="subirFoto($event, 'captura_whatsapp')" :disabled="ocupado"></label>
             <label class="archivo">🎧 Audio de WhatsApp <input type="file" accept="audio/*,.opus,.ogg" @change="subirAudio" :disabled="ocupado"></label>
           </div>
         </article>
